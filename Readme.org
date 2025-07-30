@@ -1,0 +1,45 @@
+* Module
+  - Each call to the =Loader= creates a Module
+  - Consists of Single or Many Translation units
+  - Somewaht isolated ?!
+
+* Symbol
+  Modules export Symbol table for linkage
+
+** Function
+   If in debug mode contains both source (AST) and byte code
+   allows to be used indie live debugger
+  
+
+* Memory Sections
+  Employ different Memory sections to aid Garbage Collection
+
+  Idealy Memory is relocatable, aim for mark/sweep
+  Pointers need to be visible to GC
+  
+** Module
+   Storage page for Loaded [[Module]]s, which includes
+   - Static Data (Cons, strings)
+   - Byte Code
+   - Symbols
+
+   Constant Memory Section, will not be changed after creation and be
+  freed upon module unload
+
+   (Section will be loaded on restart no relocation required)
+** Cons
+   Storage for Cons cells
+
+   In most cases Cons cells will be in a hierachy List/Tree like
+   structure => Maybe Group cons cells by dependence eg. free whole
+   page Either create runtime overhead or employ partial gc merging
+   cons into blocks, can be done semi asyn
+** Stack
+   Callframes, function stacks
+
+   - Reclaim as much memory as possible while not impacting runtime performance
+   - used by byte compiler
+
+** Interpreter
+   Performance is less critical than Byte-compiled code
+   Need to interface with byte compiler
