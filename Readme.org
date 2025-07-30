@@ -1,16 +1,22 @@
 * Module
-  - Each call to the =Loader= creates a Module
-  - Consists of Single or Many Translation units
-  - Somewaht isolated ?!
-
-* Symbol
-  Modules export Symbol table for linkage
-
-** Function
-   If in debug mode contains both source (AST) and byte code
-   allows to be used indie live debugger
-  
-
+  - Translation Unit
+  - Has Symbol Table for Linkage
+  - Has Own Memory???
+* Expr
+** Basic
+   Num,Int,String,Char ...
+** Callable
+   Callable has Environment which inlcudes its arguments
+   Arg Pattern is matched against by Interpreter and Environment bindings for args are overwritten
+   
+  - Closure :: All arguments are evaluated before passed into Environment
+    returns expression
+  - Macro :: Aguments are lifted into cons before passed into Environment
+    returned Form is evaluated
+* Optimizations
+  - Byte-Compile
+  - Eval Const Expressions and Inline Macros -> when not dependent on value of arguments
+  - Use Lists insead of Concells for code
 * Memory Sections
   Employ different Memory sections to aid Garbage Collection
 

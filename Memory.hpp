@@ -1,44 +1,27 @@
 #include <cstddef>
 #include <vector>
-#include "Value.hpp"
+#include "Expr.hpp"
 
 namespace TTT {
 
-class Cell {
-  friend class Memory;
-  Value val;
-  bool mark;
-};
+	class Memory {
 
-class RefSanitize {
-  friend class Memory;
-  std::vector<Cell *> killed;
-  long long base_offset;
-  RefSanitize(std::vector<Cell *> killed, long long base_offset)
-  : killed(std::move(killed)), base_offset(base_offset) {}
-  RefSanitize() = default;
-};
+		float grow_factor = 2;
+		size_t grow_threshold = 2 << 10;
 
-class Memory {
+		std::vector<Sexp> block;
+	public:
+		Memory(size_t initial) { block.reserve(initial); }
 
-  float grow_factor = 2;
-  size_t grow_threshold = 2 << 10;
-
-  std::vector<Cell> block;
-  auto get_dead() -> std::vector<Cell *>;
-  auto compact(std::vector<Cell *> kill, std::vector<Cell> &write)
-      -> RefSanitize;
-  void sanitize_all(const RefSanitize &correction);
-
-public:
-  Memory(size_t initial) { block.reserve(initial); }
-
-  auto alloc() -> Reference;
-  auto make_space() -> RefSanitize;
-  auto get(Reference ref) -> Value * {return &ref.ptr->val;}
-  auto available() -> size_t;
-  void clear_marks();
-  void mark(Reference);
-  static void sanitize(Reference &ref, const RefSanitize &correction);
-};
+		/*
+		 * Allocate new Cell initilized to null
+		 */
+		auto alloc() -> Sexp*;
+		/*
+		 * Perform compacting copy of Memory
+		 */
+		auto compact();
+		void clear_marks();
+		void mark();
+	};
 } // namespace TTT
