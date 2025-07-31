@@ -17,6 +17,9 @@
   - Byte-Compile
   - Eval Const Expressions and Inline Macros -> when not dependent on value of arguments
   - Use Lists insead of Concells for code
+  - Expressions -> use polymorphism with GC +Arena+ allocation
+  - Only have global Scope and local scope overlays (as vectors?)
+    
 * Memory Sections
   Employ different Memory sections to aid Garbage Collection
 

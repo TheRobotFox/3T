@@ -15,14 +15,19 @@ auto Sexp::operator==(const Sexp &other) const -> bool
 	return this == &other || body == other.body;
 }
 
+auto HashTableExpr::operator==(const HashTableExpr &other) const -> bool
+{
+	return value == other.value;
+}	 
+
 template <class T>
 inline void hash_combine(std::size_t& seed, const T& v)
 {
     std::hash<T> hasher;
     seed ^= hasher(v) + 0x9e3779b9 + (seed<<6) + (seed>>2);
 }
-auto SexpHash::operator()(const Sexp *s) -> size_t {
-  return std::hash<Sexp>{}(*s);
+auto SexpHash::operator()(const Sexp &s) -> size_t {
+  return std::hash<Sexp>{}(s);
 }
 
 auto std::hash<Sexp>::operator()(const Sexp &s) -> size_t
@@ -91,9 +96,9 @@ auto std::hash<Null>::operator()(const Null &s) -> size_t
 	return 0;
 }
 
-auto SexpEq::operator()(const Sexp *a,const Sexp *b) -> bool
+auto SexpEq::operator()(const Sexp &a,const Sexp &b) -> bool
 {
-	return *a==*b;
+	return a==b;
 }
 
 
@@ -103,8 +108,3 @@ auto Environment::lookup(SymbolExpr sym) const -> Sexp*
 	return nullptr;
 }
 
-
-	void test(){
-		NumberExpr a,b;
-		bool res = a==b;
-	}
