@@ -54,7 +54,7 @@ auto Interpreter::eval_closure( Closure &cl, Environment& env, ConsExpr args, Se
 
 auto Interpreter::eval_special( Special &fn, Environment &env, ConsExpr args, Sexp *out) -> bool
 {
-	return fn.func(args, env, out, &error);
+	return fn.func(*this, args, env, out);
 }	 
 
 
