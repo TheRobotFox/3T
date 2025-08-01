@@ -123,8 +123,7 @@ namespace TTT {
 	};
 	
 	struct CallableExpr {
-		std::string name, doc;
-		Environment env;
+		Environment env; // TODO vector overlay
 		std::vector<SymbolExpr> args;
 		std::optional<SymbolExpr> rest;
 

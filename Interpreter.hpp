@@ -7,11 +7,13 @@ namespace TTT {
 	struct Module;
 	
 	class Interpreter {
-		auto eval(const Sexp &x, Environment &env, Sexp *out) -> bool;
-		auto eval_closure( Closure &cl,  Environment& env, ConsExpr args, Sexp *out) -> bool;
+
+		auto eval_closure( Closure &cl,	 Environment& env, ConsExpr args, Sexp *out) -> bool;
 		auto eval_special( Special &fn, Environment& env, ConsExpr args, Sexp *out) -> bool;
 	public:
-
+		
+		auto eval(const Sexp &x, Environment &env, Sexp *out) -> bool;
+		
 		Module &mod;
 		std::string error;
 		Interpreter(Module &mod)

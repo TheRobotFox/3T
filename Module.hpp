@@ -10,7 +10,8 @@ namespace TTT {
 		long gensyms = 0;
 
 	public:
-
+		Environment global;
+		
 		auto get_symbol_name(SymbolExpr s) -> std::string_view {
 			if(s.id < 0) return "#GENSYM";
 			if(s.id>= symbols.size()) return "#UNKNOWNSYM";

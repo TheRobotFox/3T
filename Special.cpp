@@ -2,36 +2,55 @@
 #include "Expr.hpp"
 #include "Interpreter.hpp"
 #include "Module.hpp"
+#include <variant>
 
 using namespace TTT;
 
-auto read_delimeter_(Interpreter &intp, Environment &env, Sexp *out, const InPortExpr &inp) -> bool
-{
+auto read_delimeter_(Interpreter &intp, Environment &env, Sexp *out,
+					 const InPortExpr &inp) -> bool {
 	// get closing delimeter from env
-	
+
 	CharExpr closing;
-	if(auto *end = std::get_if<CharExpr>(&env.lookup(intp.mod.intern("closing"))->body)){
+	if (auto *end = std::get_if<CharExpr>(
+										  &env.lookup(intp.mod.intern("closing"))->body)) {
 		closing = *end;
-	}else {
-		intp.error = "expected closing delimeter to be CharExpr!"; // TODO better Error
+	} else {
+		intp.error =
+			"expected closing delimeter to be CharExpr!"; // TODO better Error
 		return false;
 	}
 
-	
 	// backup readtable and overwrite with EOF indicator
-	
+
 	auto &readtable = intp.mod.readtable.value;
-	
+
 	std::optional<Sexp> restore = {};
-	if(readtable.contains(Sexp{closing})) restore = readtable[Sexp{closing}];
+	if (readtable.contains(Sexp{closing}))
+		restore = readtable[Sexp{closing}];
 
-	static SymbolExpr eof = intp.mod.gensym();
-	Sexp return_eof = Sexp{eof};
-	readtable[Sexp{closing}] = Sexp{CallableExpr{.value = Closure{.body = &return_eof}}};
+	static Sexp eof	   = Sexp{intp.mod.gensym()};
+	readtable[Sexp{closing}] = Sexp{CallableExpr{.value = Closure{.body = &eof}}};
 
-	Sexp *res = intp.mod.memory.alloc(),
-		 *current = res;
+	// read until eof indicator
 
+	Sexp *res = intp.mod.memory.alloc(), *current = res;
+	Sexp *read = intp.mod.global.lookup(intp.mod.intern("read"));
+
+	while (true) {
+		if (intp.eval(*read, env, current))
+			return false;
+		if (*current == eof)
+			break;
+
+		// push new cons
+		res		   = intp.mod.memory.alloc();
+		Sexp *next = intp.mod.memory.alloc();
+		*res	   = Sexp{ConsExpr{.car = current, .cdr = next}};
+		current	   = next;
+	}
 	
-	while() // call read -> has its own env
-}    
+	*current = Sexp{Null{}};
+
+	*out = *res;
+	return true;
+}

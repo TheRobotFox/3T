@@ -2,7 +2,9 @@
   - Translation Unit
   - Has Symbol Table for Linkage
   - Has Own Memory???
+  - Data Modell
 * Expr
+  - Building Block of Structure
 ** Basic
    Num,Int,String,Char ...
 ** Callable
@@ -13,11 +15,17 @@
     returns expression
   - Macro :: Aguments are lifted into cons before passed into Environment
     returned Form is evaluated
+* Interpreter
+  - Evaluation Context
+  - provides exceution context to GC
 * Optimizations
   - Byte-Compile
   - Eval Const Expressions and Inline Macros -> when not dependent on value of arguments
   - Use Lists insead of Concells for code
   - Expressions -> use polymorphism with GC +Arena+ allocation
+    Compacting Heap without Alignment  is dangerous when overwriting witth larger objects
+    Prob better suited for immutable lisp
+    
   - Only have global Scope and local scope overlays (as vectors?)
     
 * Memory Sections
@@ -49,6 +57,6 @@
    - Reclaim as much memory as possible while not impacting runtime performance
    - used by byte compiler
 
-** Interpreter
-   Performance is less critical than Byte-compiled code
-   Need to interface with byte compiler
+* Progress
+- Implement special Forms first -> loop, map, if ...
+- Implement read-delim as lisp fn
