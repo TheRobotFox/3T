@@ -6,6 +6,15 @@
 
 using namespace TTT;
 
+auto is_cons(Interpreter &interpreter, ConsExpr sexp, Environment &env,
+			 Sexp *out) -> bool {
+	if (const auto *x = std::get_if<ConsExpr>(&sexp.cdr->body)) {
+		if (std::holds_alternative<ConsExpr>(x->car->body)) {
+			*out = 
+	  }
+	}
+}
+
 auto read_delimeter_(Interpreter &intp, Environment &env, Sexp *out,
 					 const InPortExpr &inp) -> bool {
 	// get closing delimeter from env

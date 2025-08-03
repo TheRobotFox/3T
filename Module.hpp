@@ -1,4 +1,3 @@
-#include "Expr.hpp"
 #include "Memory.hpp"
 #include "Special.hpp"
 #include <vector>
@@ -10,7 +9,7 @@ namespace TTT {
 		long gensyms = 0;
 
 	public:
-		Environment global;
+		Env global;
 		
 		auto get_symbol_name(SymbolExpr s) -> std::string_view {
 			if(s.id < 0) return "#GENSYM";

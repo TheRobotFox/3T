@@ -1,18 +1,44 @@
-#include "Expr.hpp"
+#include "Atom.hpp"
 #include <expected>
 
 
 namespace TTT {
 
-	struct Module;
-	
-	class Interpreter {
+	template<class T>
+	concept Evaluating = requires(T &e,	Interpreter &interp, Env &env) {
+ {e.eval(interp, env) } -> std::same_as<Atom*>;
+	};
 
-		auto eval_closure( Closure &cl,	 Environment& env, ConsExpr args, Sexp *out) -> bool;
-		auto eval_special( Special &fn, Environment& env, ConsExpr args, Sexp *out) -> bool;
-	public:
+	struct CallEval {
+		Interpreter &interp;
+		Env &env;
+		Atom &self;
+
+		template <class T>		auto operator()(T &_) const -> Atom* {return &self;};
+		auto operator()(Symbol &sym) const -> Atom*;
+		auto operator()(Call &call) const -> Atom*;
+	};
+
+
+
+	template<class T>
+	concept Container = requires(T &e,	Memory &mem) {
+ e.mark_children(mem); 
+	};
+
+
+	struct CallMark {
+		Memory &mem;
+		template<class T>
+		void operator()(const T&_){};
+		template<Container T>
+		void operator()(const T&c){c.mark_children(mem);};
+
+	};
+
+
+	struct Interpreter {
 		
-		auto eval(const Sexp &x, Environment &env, Sexp *out) -> bool;
 		
 		Module &mod;
 		std::string error;
@@ -20,7 +46,9 @@ namespace TTT {
 		: mod(mod)
 		{}
 
-		auto evaluate(Sexp x, Environment &env) -> std::expected<Sexp, std::string>;
+		auto eval(Atom &x, Env &env) -> Atom * {
+			return x.visit(CallEval{.interp=*this, .env=env, .self=x});
+		}
 
 	};
 }

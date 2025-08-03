@@ -1,4 +1,5 @@
 #include "Interpreter.hpp"
+#include <cstddef>
 #include <format>
 #include <utility>
 #include <variant>
@@ -6,86 +7,128 @@
 
 using namespace TTT;
 
-auto next_arg(ConsExpr *current) -> bool
-{
-	auto *res = std::get_if<ConsExpr>(&(current)->cdr->body);
-	if(res == nullptr) return false;
-	*current = *res;
-	return true;
+
+auto CallEval::operator()(Symbol &sym) const -> Atom* {
+	if (env.contains(sym.id))
+		return env.at(sym.id);
+	if (interp.mod.global.contains(sym.id))
+		return interp.mod.global.at(sym.id);
+	interp.error = std::format("Symbol %s is not in scope!", interp.mod.get_symbol_name(sym.id));
+	return nullptr;
 }
 
-auto Interpreter::eval_closure( Closure &cl, Environment& env, ConsExpr args, Sexp *out) -> bool
-{
-	int count = 0;
-	for(SymbolExpr arg_name : cl.args){
-		if(args.cdr == nullptr) goto arg_count_error;
-		if(!next_arg(&args)) goto proper_list_error;
+struct Cons_iterator {
+	Atom *current;
+	auto next() -> Atom * {
+		if (auto *cons = std::get_if<Cons>(current)) {
+			current = cons->cdr;
+			return cons->car;
+		}
+		return nullptr;
+	}
+	auto count() -> size_t {
+		size_t length = 0;
+		while (next() != nullptr)
+			length++;
+		return length;
+	}
+};
+
+struct CallProc {
+	Interpreter &interp;
+	Env &env;
+	Cons_iterator args;
+
+	auto operator()(Closure &c) -> Atom * {
+		size_t args_expected = c.args.size(), args_recieved = 0;
+
+		for (; args_recieved < args_expected; args_recieved++) {
+			if(auto *arg = args.next()) {
+				if (auto *eval = interp.eval(*arg, env)) {
+					c.env[ c.args[args_recieved] ] = eval;
+				} else
+					return nullptr;
+			} else goto arg_count_error;
+		}
+		if (c.rest != 0) {
+			Atom *res = interp.mod.memory.alloc(), *end = res;
+			while (auto *arg = args.next()) {
+				if (auto *eval = interp.eval(*arg, env)) {
+					Atom *next = interp.mod.memory.alloc();					
+					*end = Cons{.car = eval, .cdr = next};
+					end = next;
+				} else
+					return nullptr;
+			}
+			if (auto *eval = interp.eval(*args.current, env)) {
+				*end = *eval;
+			} else
+				return nullptr;
+			c.env[c.rest] = args.current;
+		} else if (!std::holds_alternative<nil>(*args.current)) {
+			args_recieved += args.count();
+			goto arg_count_error;
 			
-		Sexp *arg_val = mod.memory.alloc();
-		if(!eval(*args.car, env, arg_val)) return false;
-		cl.env.bind(arg_name, arg_val);
-		count++;
-	}
-
-	if(cl.rest){
-		Sexp *rest = mod.memory.alloc();
-		while(args.cdr != nullptr){
-			if(!next_arg(&args)) goto proper_list_error;
-			Sexp *arg_val = mod.memory.alloc(), *next = mod.memory.alloc();
-			rest->body = ConsExpr{.car=arg_val, .cdr=next};
-			rest = next;
-
-			if(!eval(*args.car, env, arg_val)) return false;
 		}
-		cl.env.bind(*cl.rest, rest);
 
-	} else if(args.cdr != nullptr) goto arg_count_error;
+		return interp.eval(*c.body, c.env);
 		
-	return eval(*cl.body, cl.env, out);
-
  arg_count_error:
-	error = std::format("Unexpected Number of Arguments! Expected %d got %d!", cl.args.size(), count);
-	return false;
-	
- proper_list_error:
-	error = std::format("Argument List not proper List!");
-	return false;
-}
+		interp.error = std::format("Lambda expected %d args but got %d", args_expected, args_recieved);
+		return nullptr;
+	}
 
-auto Interpreter::eval_special( Special &fn, Environment &env, ConsExpr args, Sexp *out) -> bool
-{
-	return fn.func(*this, args, env, out);
-}	 
-
-
-auto Interpreter::eval(const Sexp &x, Environment &env, Sexp *out) -> bool
-{
-	if(const auto* sym = std::get_if<SymbolExpr>(&x.body)){
+		auto operator()(Macro &c) -> Atom * {
 		
-		if(auto *s = env.lookup(*sym)){
-			*out = *s;
-			return true;
 		}
-		error = std::format("Could not find Symbol %s in Environment!", mod.symbol_names[*sym]);
-		return false;
-	}
-	if(const auto* cons = std::get_if<ConsExpr>(&x.body)){
-
-		Sexp eval_fn;
-		if(!eval(*cons->car, env, &eval_fn)) return false;
-
-		if(auto *callable = std::get_if<CallableExpr>(&eval_fn.body)){
-			if( auto *cl = std::get_if<Closure>(&callable->value))
-				return eval_closure(*cl, env, *cons, out);
-			if( auto *mc = std::get_if<Macro>(&callable->value))
-				return false;
-			if( auto *sp = std::get_if<Special>(&callable->value))
-				return eval_special(*sp, env, *cons, out);
+		auto operator()(Special &c) -> Atom * {}
+	
+		template<class T> auto operator()(T &c) -> Atom * {
+			interp.error = std::format("Atom is not valid Function!");
+			return nullptr;
 		}
-		error = std::format("Form is not a callable!");
-		return false;
+	};
+
+	auto CallEval::operator()(Call &call) const -> Atom * {
+		Atom *fn = interp.eval(*call.head, env);
+
+		fn->visit(CallProc{.interp=interp, .env=env, .args=call.args});
 	}
-	*out = x;
-	return true;
-}	 
+
+	auto Interpreter::eval_special( Special &fn, Environment &env, ConsExpr args, Sexp *out) -> bool
+	{
+		return fn.func(*this, args, env, out);
+	}	 
+
+
+	auto Interpreter::eval(const Sexp &x, Environment &env, Sexp *out) -> bool
+	{
+		if(const auto* sym = std::get_if<SymbolExpr>(&x.body)){
+		
+			if(auto *s = env.lookup(*sym)){
+				*out = *s;
+				return true;
+			}
+			error = std::format("Could not find Symbol %s in Environment!", mod.symbol_names[*sym]);
+			return false;
+		}
+		if(const auto* cons = std::get_if<ConsExpr>(&x.body)){
+
+			Sexp eval_fn;
+			if(!eval(*cons->car, env, &eval_fn)) return false;
+
+			if(auto *callable = std::get_if<CallableExpr>(&eval_fn.body)){
+				if( auto *cl = std::get_if<Closure>(&callable->value))
+					return eval_closure(*cl, env, *cons, out);
+				if( auto *mc = std::get_if<Macro>(&callable->value))
+					return false;
+				if( auto *sp = std::get_if<Special>(&callable->value))
+					return eval_special(*sp, env, *cons, out);
+			}
+			error = std::format("Form is not a callable!");
+			return false;
+		}
+		*out = x;
+		return true;
+	}	 
 

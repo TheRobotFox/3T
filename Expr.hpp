@@ -15,28 +15,34 @@ namespace TTT {
 		long		id;
 		auto operator==(const SymbolExpr &other) const -> bool = default;
 	};
+
+	struct Quoted {
+		SymbolExpr sym;
+		auto operator==(const Quoted &other) const -> bool = default;		
+	};
+	
 	struct NumberExpr
-    {
+	{
 		double value;
 		auto operator==(const NumberExpr& other) const -> bool = default;
 	};
 	struct IntegerExpr
-    {
+	{
 		int		value;
 		auto operator==(const IntegerExpr& other) const -> bool = default;
 	};
 	struct StringExpr
-    {
+	{
 		std::string		value;
 		auto operator==(const StringExpr& other) const -> bool = default;
 	};
 	struct CharExpr
-    {
+	{
 		char	value;
 		auto operator==(const CharExpr& other) const -> bool = default;
 	};
-    struct InPortExpr
-    {
+	struct InPortExpr
+	{
 		std::istream value;
 		auto operator==(const InPortExpr &other) const -> bool
 		{
@@ -44,7 +50,7 @@ namespace TTT {
 		}
 
 	};
-    struct OutPortExpr
+	struct OutPortExpr
 	{
 		std::ostream value;
 		auto operator==(const OutPortExpr &other) const -> bool
@@ -73,23 +79,27 @@ namespace TTT {
 		auto operator==(const ConsExpr &other) const -> bool;
 			
 	};
-	struct Null {auto operator==(const Null &_) const -> bool{return true;}};
+	struct Null {
+		auto operator==(const Null &_) const -> bool { return true; }
+	};
 
-	using Expr = std::variant<SymbolExpr,
-							  NumberExpr,
-							  Null,
-							  IntegerExpr,
-							  StringExpr,
-							  CharExpr,
-							  CallableExpr,
-							  HashTableExpr,
-							  ConsExpr>;
+	using Expr = std::variant < SymbolExpr, Quoted,
+							   NumberExpr, Null,
+							   IntegerExpr, StringExpr,
+							   InPortExpr, OutPortExpr,
+							   CharExpr,
+							   CallableExpr,
+							   HashTableExpr,
+							   ConsExpr>;
 
+	using Env = std::map<SymbolExpr, Sexp*>;
 	struct Environment {
-		using Env = std::map<SymbolExpr, Sexp*>;
-		Env env;
+		Env &global, local;
 		auto lookup(SymbolExpr sym) const -> Sexp*;
-		void bind(SymbolExpr sym, Sexp* value){env[sym]=value;}
+		void bind(SymbolExpr sym, Sexp *value) {
+		  local.emplace(sym, value);
+		}
+		Environment(Env &global) : global(global) {}
 	};
 
 
@@ -99,7 +109,6 @@ namespace TTT {
 		{
 			return body == other.body;
 		}
-		
 	};
 	
 	struct Closure {
@@ -119,7 +128,6 @@ namespace TTT {
 		{
 			return this == &other;
 		}
-		
 	};
 	
 	struct CallableExpr {
@@ -148,6 +156,10 @@ struct std::hash<TTT::Sexp> {
 template<>
 struct std::hash<TTT::HashTableExpr> {
 	auto operator()(const TTT::HashTableExpr &s) -> size_t;
+};
+template<>
+struct std::hash<TTT::Quoted> {
+	auto operator()(const TTT::Quoted &s) -> size_t;
 };
 template<>
 struct std::hash<TTT::NumberExpr> {
@@ -187,5 +199,5 @@ struct std::hash<TTT::OutPortExpr> {
 };
 template<>
 struct std::hash<TTT::Null> {
-	auto operator()(const TTT::Null &s) -> size_t;
+	auto operator()(const TTT::Null &_) -> size_t;
 };

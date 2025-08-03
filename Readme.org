@@ -15,6 +15,9 @@
     returns expression
   - Macro :: Aguments are lifted into cons before passed into Environment
     returned Form is evaluated
+* Type Hierachie
+  - GC fixed spacing/ padding (max of types)?
+  - Both Untyped Memory and Compact storage -> compatible
 * Interpreter
   - Evaluation Context
   - provides exceution context to GC
@@ -56,7 +59,36 @@
 
    - Reclaim as much memory as possible while not impacting runtime performance
    - used by byte compiler
+* Stages
+** Readtime
+   Input: Char Stream
+   Output: Sexp
 
+   [a-z...] -> Symbol
+   ' -> Quoted
+   [0-9]+,"..." -> Literals
+   Cons -> Cons
+
+   + other reader shit
+** Expansion Time
+   Input: Sexp
+   Output: 3T Expr
+
+   Symbol -> Reference, Callable
+   Literal -> Literal
+   Cons -> Cons, Macro expansion
+** Interpreter
+   Input: 3T Expr
+   Output: Sexp
+** Compiler
+   Input: 3T Expr
+   Output: ByteCode
 * Progress
 - Implement special Forms first -> loop, map, if ...
 - Implement read-delim as lisp fn
+
+
+* Immutabillity
+  * Spoof Cons with faster iterators
+  * Compact Storage in GC
+  * More Optimazations
