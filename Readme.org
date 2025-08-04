@@ -13,6 +13,7 @@
    
   - Closure :: All arguments are evaluated before passed into Environment
     returns expression
+    When compiling number of args is known -> env can be efiicently compiled
   - Macro :: Aguments are lifted into cons before passed into Environment
     returned Form is evaluated
 * Type Hierachie

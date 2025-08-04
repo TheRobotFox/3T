@@ -50,7 +50,13 @@ namespace TTT {
 					 Closure, Macro, Special, Call, InPort, OutPort>;
 
 
-	using Env = std::unordered_map<SymbolId, Atom *>;
+	struct Environment {
+
+		std::string name;
+		std::unordered_map<SymbolId, Atom *> bindings;
+		Environment *parent;
+	};
+
 
 } // namespace TTT
 using namespace TTT;
@@ -112,10 +118,11 @@ template<> struct std::hash<nil> {
  ****************************************************/
 
 struct Callable {
-	Env *env;
+	Environment env;
 	std::vector<SymbolId> args;
 	SymbolId rest;
 };
+
 struct TTT::Closure : Callable {Atom *body; /* byte code */	};
 struct TTT::Macro   : Callable {Atom *body;					};
 struct TTT::Special : Callable {							};
