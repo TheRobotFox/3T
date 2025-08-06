@@ -1,7 +1,9 @@
-
+#pragma once
 #include <cstddef>
+#include <fstream>
 #include <functional>
 #include <istream>
+#include <memory>
 #include <unordered_map>
 #include <variant>
 #include <concepts>
@@ -17,6 +19,7 @@ namespace TTT {
 	template <class T> struct LitImpl;
 
 	using	String	= LitImpl<std::string>;
+	using	Char	= LitImpl<char>;
 	using	Integer = LitImpl<long long>;
 	using	Real	= LitImpl<double>;
 	using	Quoted	= LitImpl<SymbolId>;
@@ -37,23 +40,28 @@ namespace TTT {
 	
 	// Miscellaneously
 	
-	struct nil {};
-	struct t   {};
+	struct nil;
+	struct t;
 	struct InPort;
 	struct OutPort;
 	struct Symbol;
 
-
+	
 
 	using Atom =
-		std::variant<t, nil, String, Integer, Real, Symbol, Quoted, Cons, HashTable,
+		std::variant<t, nil, String, Char, Integer, Real, Symbol, Quoted, Cons, HashTable,
 					 Closure, Macro, Special, Call, InPort, OutPort>;
 
 
 	using Env = std::unordered_map<SymbolId, Atom *>;
+	struct Cons_iterator;
 
 } // namespace TTT
 using namespace TTT;
+
+template<> struct std::hash<Atom> {
+	auto operator()(const Atom &_)	-> size_t;
+};
 
 
 
@@ -63,12 +71,25 @@ using namespace TTT;
 
 template <class T> struct TTT::LitImpl {
 	T value;
+	auto operator==(const LitImpl<T>&other) const -> bool = default;
+};
+struct TTT::t {
+	auto operator==(const t &_) const -> bool { return true; }
+};
+struct TTT::nil {
+	auto operator==(const nil&_) const -> bool {return true;}
 };
 
 template <class T> struct std::hash <LitImpl<T>> {
 	auto operator()(const LitImpl<T> &l) -> size_t {
 		return std::hash<T>{}(l.value);
 	}
+};
+template<> struct std::hash<t> {
+	auto operator()(const t &_)		-> size_t {return-1;};
+};
+template<> struct std::hash<nil> {
+	auto operator()(const nil &_)	-> size_t {return 0;};
 };
 
 
@@ -81,26 +102,32 @@ template <class T> struct std::hash <LitImpl<T>> {
 
 struct TTT::Symbol {
 	SymbolId id;
-	auto eval(Interpreter &interp, Env &env) const -> Atom*;		
+	auto operator==(const Symbol &other) const -> bool = default;
 };
 
-struct TTT::InPort  {std::istream value;};
-struct TTT::OutPort {std::ostream value;};
+struct TTT::InPort {
+	std::istream *value;
+	auto operator==(const InPort &other) const -> bool {
+	  return value == other.value;
+	}
+	~InPort(){delete value;}
+};
+struct TTT::OutPort {
+	std::ostream *value;
+	auto operator==(const OutPort &other) const -> bool{
+	  return value == other.value;
+	}
+	~OutPort(){delete value;}
+};
 
 template<> struct std::hash<Symbol> {
-  auto operator()(const Symbol &c)		-> size_t;	
+  auto operator()(const Symbol &c)	-> size_t;	
 };
 template<> struct std::hash<InPort> {
-  auto operator()(const InPort &c)		-> size_t;	
+  auto operator()(const InPort &c)	-> size_t;	
 };
 template<> struct std::hash<OutPort> {
-  auto operator()(const OutPort &c)		-> size_t;
-};
-template<> struct std::hash<t> {
-	auto operator()(const t &_)	-> size_t {return-1;};
-};
-template<> struct std::hash<nil> {
-	auto operator()(const nil &_)	-> size_t {return 0;};
+  auto operator()(const OutPort &c) -> size_t;
 };
 
 
@@ -112,15 +139,35 @@ template<> struct std::hash<nil> {
  ****************************************************/
 
 struct Callable {
-	Env *env;
-	std::vector<SymbolId> args;
-	SymbolId rest;
+	auto operator==(const Callable &other) const -> bool {
+		return this==&other;
+	}
 };
-struct TTT::Closure : Callable {Atom *body; /* byte code */	};
-struct TTT::Macro   : Callable {Atom *body;					};
-struct TTT::Special : Callable {							};
 
-struct TTT::Call {Atom *head; Atom *args;};
+struct TTT::Closure : public Callable {
+	Atom *body; /* byte code */
+	auto operator==(const Closure &other) const -> bool = default;
+};
+struct TTT::Macro : public Callable {
+	Atom *body;
+	auto operator==(const Macro   &other) const -> bool = default;
+};
+struct TTT::Special {
+  std::function<bool(Interpreter &, Env &, const std::vector<Atom> &, Atom *)> func;
+	Env env;
+	
+	auto operator==(const Special &other) const -> bool {
+		return this == &other;
+	}
+};
+
+struct TTT::Call {
+	Atom *head;
+	std::vector<Atom> args;
+	auto operator==(const Call &other) const -> bool {
+		return this == &other;
+	}
+};
 
 
 template<> struct std::hash<Closure> {
@@ -155,9 +202,28 @@ template <> struct std::hash<HashTable> {
 struct TTT::Cons {
 	Atom *car, *cdr;
 	void mark_children(Memory &mem) const;
+	auto operator==(const Cons &other) const -> bool;
 };
+
+// struct TTT::Cons_iterator {
+// 	Atom *current;
+// 	auto next() -> Atom * {
+// 		if (auto *cons = std::get_if<Cons>(current)) {
+// 			current = cons->cdr;
+// 			return cons->car;
+// 		}
+// 		return nullptr;
+// 	}
+// 	auto count() -> size_t {
+// 		size_t length = 0;
+// 		while (next() != nullptr)
+// 			length++;
+// 		return length;
+// 	}
+// };
 
 struct TTT::HashTable {
 	std::unordered_map<Atom, Atom *> value;
 	void mark_children(Memory &mem) const;
+	auto operator==(const HashTable &other) const -> bool;
 };

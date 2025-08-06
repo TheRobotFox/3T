@@ -7,6 +7,13 @@
 using namespace TTT;
 
 
+
+/****************************************************
+ *					Literals						*
+ ****************************************************/
+
+
+
 /****************************************************
  *					Miscellaneously					*
  ****************************************************/
@@ -29,15 +36,14 @@ auto std::hash<OutPort>::operator()(const OutPort &c)	-> size_t {
  *					Procedures                      *
  ****************************************************/
 
-
 // TODO better hashing functions
 
 auto std::hash<Closure>::operator()(const Closure &c)	-> size_t {
 	return std::hash<size_t>{}((size_t)c.body);
 		}
-					auto std::hash<Macro>::operator()(const Macro &c)		-> size_t {
+auto std::hash<Macro>::operator()(const Macro &c)		-> size_t {
 	return std::hash<size_t>{}((size_t)c.body);
-	}
+}
 auto std::hash<Special>::operator()(const Special &c)	-> size_t {
 	return std::hash<size_t>{}((size_t)&c);
 }
@@ -77,7 +83,16 @@ void Cons::mark_children(Memory &memory) const {
 	memory.mark(car);
 	memory.mark(cdr);
 }
+auto Cons::operator==(const Cons &other) const -> bool {
+	return this == &other || (*car == *other.car && *cdr == *cdr);
+}
+
+
 void HashTable::mark_children(Memory &memory) const {
 	for(const auto &[k, v] : value) memory.mark(v);
+}
+
+auto HashTable::operator==(const HashTable &other) const -> bool {
+	return value == other.value;
 }
 
