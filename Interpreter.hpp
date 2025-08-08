@@ -8,9 +8,10 @@ namespace TTT {
 		const Atom &self;
 		Atom *out;
 
-		template <class T>		auto operator()(const T &_, Atom *out) const -> bool {*out = self; return true;};
-		auto operator()(const Symbol &sym, Atom *out) const -> bool;
-		auto operator()(const Call &call, Atom *out) const -> bool;
+		template <class T>
+		auto operator()(const T      &_	  ) const -> bool {*out = self; return true;};
+		auto operator()(const Symbol &sym ) const -> bool;
+		auto operator()(const Call   &call) const -> bool;
 	};
 
 
@@ -32,7 +33,6 @@ namespace TTT {
 
 
 	struct Interpreter {
-		
 		
 		Module &mod;
 		std::string error;

@@ -4,13 +4,14 @@
 #include <functional>
 #include <istream>
 #include <memory>
+#include <ostream>
 #include <unordered_map>
 #include <variant>
 #include <concepts>
 
 namespace TTT {
 	using SymbolId = long;
-	struct Memory;
+	class Memory;
 	struct Interpreter;
 
 
@@ -59,9 +60,10 @@ namespace TTT {
 } // namespace TTT
 using namespace TTT;
 
-template<> struct std::hash<Atom> {
-	auto operator()(const Atom &_)	-> size_t;
-};
+
+struct Printer;
+std::ostream &operator<<(std::ostream &os, Atom const &m);
+
 
 
 
@@ -71,7 +73,7 @@ template<> struct std::hash<Atom> {
 
 template <class T> struct TTT::LitImpl {
 	T value;
-	auto operator==(const LitImpl<T>&other) const -> bool = default;
+	auto operator==(const LitImpl<T> &other) const -> bool {return value == other.value;}
 };
 struct TTT::t {
 	auto operator==(const t &_) const -> bool { return true; }
@@ -144,12 +146,18 @@ struct Callable {
 	}
 };
 
-struct TTT::Closure : public Callable {
+struct TTT::Closure {
 	Atom *body; /* byte code */
+	Env env;
+	std::vector<SymbolId> args;
+	SymbolId rest;
 	auto operator==(const Closure &other) const -> bool = default;
 };
-struct TTT::Macro : public Callable {
+struct TTT::Macro {
 	Atom *body;
+	Env env;
+	std::vector<SymbolId> args;
+	SymbolId rest;
 	auto operator==(const Macro   &other) const -> bool = default;
 };
 struct TTT::Special {
@@ -223,7 +231,11 @@ struct TTT::Cons {
 // };
 
 struct TTT::HashTable {
-	std::unordered_map<Atom, Atom *> value;
+	std::unordered_map<Atom, Atom *> *value;
+	bool own;
 	void mark_children(Memory &mem) const;
 	auto operator==(const HashTable &other) const -> bool;
+	~HashTable() { if(own) delete value; }
+	HashTable(std::unordered_map<Atom, Atom *> &&value) : value(new std::unordered_map(value)), own(true){}
+	HashTable(std::unordered_map<Atom, Atom *> &value) : value(&value), own(false){}
 };

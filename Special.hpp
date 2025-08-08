@@ -5,75 +5,82 @@
 
 namespace TTT {
 
-// 	template <class T>
-// 	constexpr
-// 	std::string_view
-// 	type_name()
-// 	{
-// 		using namespace std;
-// #ifdef __clang__
-// 		string_view p = __PRETTY_FUNCTION__;
-// 		return string_view(p.data() + 34, p.size() - 34 - 1);
-// #elif defined(__GNUC__)
-// 		string_view p = __PRETTY_FUNCTION__;
-// #  if __cplusplus < 201402
-// 		return string_view(p.data() + 36, p.size() - 36 - 1);
-// #  else
-// 		return string_view(p.data() + 49, p.find(';', 49) - 49);
-// #  endif
-// #elif defined(_MSC_VER)
-// 		string_view p = __FUNCSIG__;
-// 		return string_view(p.data() + 84, p.size() - 84 - 7);
-// #endif
-// 	}
+	//	template <class T>
+	//	constexpr
+	//	std::string_view
+	//	type_name()
+	//	{
+	//		using namespace std;
+	// #ifdef __clang__
+	//		string_view p = __PRETTY_FUNCTION__;
+	//		return string_view(p.data() + 34, p.size() - 34 - 1);
+	// #elif defined(__GNUC__)
+	//		string_view p = __PRETTY_FUNCTION__;
+	// #  if __cplusplus < 201402
+	//		return string_view(p.data() + 36, p.size() - 36 - 1);
+	// #  else
+	//		return string_view(p.data() + 49, p.find(';', 49) - 49);
+	// #  endif
+	// #elif defined(_MSC_VER)
+	//		string_view p = __FUNCSIG__;
+	//		return string_view(p.data() + 84, p.size() - 84 - 7);
+	// #endif
+	//	}
 
 
-// 	template <class Fn, class... Args>
-// 	struct arg_parser {
+	//	template <class Fn, class... Args>
+	//	struct arg_parser {
 
-// 		std::string error;
-// 		template<std::size_t I = 0, typename... Tp>
-// 		inline typename std::enable_if<I == sizeof...(Tp), void>::type
-// 		parse_arg(std::tuple<Tp...>& t, Sexp *null)
-// 		{
-// 			if(null == nullptr || std::holds_alternative<Null>(null->body))
-// 				return true;
-// 			error = std::format("Wrong Number of Arguments! Expected %d got >%d", sizeof...(Tp), I);
-// 			return false;
-// 		}
+	//		std::string error;
+	//		template<std::size_t I = 0, typename... Tp>
+	//		inline typename std::enable_if<I == sizeof...(Tp), void>::type
+	//		parse_arg(std::tuple<Tp...>& t, Sexp *null)
+	//		{
+	//			if(null == nullptr || std::holds_alternative<Null>(null->body))
+	//				return true;
+	//			error = std::format("Wrong Number of Arguments! Expected %d got >%d", sizeof...(Tp), I);
+	//			return false;
+	//		}
 
-// 		template<std::size_t I = 0, typename... Tp>
-// 		inline typename std::enable_if<I < sizeof...(Tp), void>::type
-// 		parse_arg(std::tuple<Tp&...> &t, Sexp *sexp)
-// 		{
-// 			if(const auto *argv = std::get_if<ConsExpr>(&sexp->body)){
+	//		template<std::size_t I = 0, typename... Tp>
+	//		inline typename std::enable_if<I < sizeof...(Tp), void>::type
+	//		parse_arg(std::tuple<Tp&...> &t, Sexp *sexp)
+	//		{
+	//			if(const auto *argv = std::get_if<ConsExpr>(&sexp->body)){
 			
-// 				if(const auto *arg = std::get_if<Tp...[I]>(&argv->car->body)){
-// 					std::get<I>(t) = *arg;
-// 					return parse_arg<I+1, Tp...>(t, argv->cdr);
-// 				}
-// 				error = std::format("Arg %d wrong Type! Expected %s got %d", type_name<Tp...[I]>(), argv->car->body.index(), I);
-// 				return false;
-// 			}
-// 			if(std::holds_alternative<Null>(sexp->body))
-// 				error = std::format("Wrong Number of Arguments! Expected %d got %d", I, sizeof...(Tp));
-// 			else
-// 				error = std::format("Arglist not proper List at %d! Expected Cons got %d", I, sexp->body.index());
-// 			return false;
-// 		}
+	//				if(const auto *arg = std::get_if<Tp...[I]>(&argv->car->body)){
+	//					std::get<I>(t) = *arg;
+	//					return parse_arg<I+1, Tp...>(t, argv->cdr);
+	//				}
+	//				error = std::format("Arg %d wrong Type! Expected %s got %d", type_name<Tp...[I]>(), argv->car->body.index(), I);
+	//				return false;
+	//			}
+	//			if(std::holds_alternative<Null>(sexp->body))
+	//				error = std::format("Wrong Number of Arguments! Expected %d got %d", I, sizeof...(Tp));
+	//			else
+	//				error = std::format("Arglist not proper List at %d! Expected Cons got %d", I, sexp->body.index());
+	//			return false;
+	//		}
 
 
-// 		auto operator()() -> std::function<bool(Interpreter &interpreter, ConsExpr sexp, Env &env,
-// 						Sexp *out)>
-// 		{
-// 			return [*this](Interpreter &interpreter, ConsExpr sexp, Env &env, Sexp *out){
-// 				std::tuple<Args&...> argv;
-// 				parse_arg<0, Args...>(argv, sexp.cdr);
+	//		auto operator()() -> std::function<bool(Interpreter &interpreter, ConsExpr sexp, Env &env,
+	//						Sexp *out)>
+	//		{
+	//			return [*this](Interpreter &interpreter, ConsExpr sexp, Env &env, Sexp *out){
+	//				std::tuple<Args&...> argv;
+	//				parse_arg<0, Args...>(argv, sexp.cdr);
 
-// 				std::apply(Fn{}, std::tuple_cat(std::make_tuple(interpreter, env, out), argv));
-// 			};
-// 		}
-// 	};
+	//				std::apply(Fn{},
+	// std::tuple_cat(std::make_tuple(interpreter, env, out), argv));
+	//			};
+	//		}
+	//	};
+
+	enum InternalSymbols : SymbolId {
+		eof	 = -1,
+		backup = -2,
+		eof_func=-3
+	};
 
 	auto argument_error(int expected, int got) -> std::string {
 		return std::format("Expected %d Arguments got");
@@ -82,7 +89,7 @@ namespace TTT {
 	template <class T>
 	auto is_T(Interpreter &interp, Env &env, const std::vector<Atom> &args,
 			  Atom *out) -> bool {
-		if (call.size() != 1) {
+		if (args.size() != 1) {
 			interp.error = argument_error(1, args.size());
 			return false;
 		}
@@ -104,11 +111,14 @@ namespace TTT {
 	auto get_cdr(Interpreter &interp, Env &env, const std::vector<Atom> &args,
 				 Atom *out) -> bool;
 
-	auto _if(Interpreter &interp, Env &env, std::vector<Atom> &call,
+	auto _if(Interpreter &interp, Env &env, const std::vector<Atom> &args,
 			 Atom *out) -> bool;
 
-auto read_delimeter(Interpreter &interp, Env &env, const std::vector<Atom> &call,
-					Atom *out) -> bool;
-	// using read_delimeter = arg_parser<decltype(read_delimeter_), InPortExpr, CharExpr>;
+	auto read_delimeter		(Interpreter &interp, Env &env, const std::vector<Atom> &call, Atom *out) -> bool;
+	auto read_whitespace	(Interpreter &interp, Env &env, const std::vector<Atom> &args, Atom *out) -> bool;
+	auto read_comment		(Interpreter &interp, Env &env, const std::vector<Atom> &args, Atom *out) -> bool;
+	auto read_string		(Interpreter &interp, Env &env, const std::vector<Atom> &args, Atom *out) -> bool;
+	auto read_char			(Interpreter &interp, Env &env, const std::vector<Atom> &args, Atom *out) -> bool;
+	auto read				(Interpreter &interp, Env &env, const std::vector<Atom> &args, Atom *out) -> bool;
 
 }

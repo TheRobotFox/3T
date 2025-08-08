@@ -1,94 +1,62 @@
 #include "Module.hpp"
+
+#include <unordered_map>
+#include <utility>
 #include "Atom.hpp"
 #include "Special.hpp"
+
+using std::move;
 
 using namespace TTT;
 
 Module::Module()
 : memory(1024 * 1024 * 100) // 100Mb
 {
-
+	register_atom("cons?"		, Special{.func = is_T<Cons>		, .env = {}	});
+	register_atom("num?"		, Special{.func = is_T<Real>		, .env = {}	});
+	register_atom("int?"		, Special{.func = is_T<Integer>	, .env = {}	});
+	register_atom("string?"		, Special{.func = is_T<String>		, .env = {}	});
+	register_atom("symbol?"		, Special{.func = is_T<Symbol>		, .env = {}	});
+	register_atom("quoted?"		, Special{.func = is_T<Quoted>		, .env = {}	});
+	register_atom("hash?"		, Special{.func = is_T<HashTable>	, .env = {} });
+	register_atom("in-port?"	, Special{.func = is_T<InPort>		, .env = {}	});
+	register_atom("out-port?"	, Special{.func = is_T<OutPort>	, .env = {}	});
+	register_atom("closure?"	, Special{.func = is_T<Closure>	, .env = {} });
+	register_atom("car"			, Special{.func = get_car			, .env = {} });
+	register_atom("cdr"			, Special{.func = get_cdr			, .env = {} });
+	register_atom("if"			, Special{.func = _if				, .env = {} });
+	register_atom("read"			, Special{.func = read			, .env = {} });
+	Atom * f_error = register_atom("error"		, Special{.func = error			, .env = {} });
+	
+	
 	// Read Table
-	// Initilize Global Scope
-	Atom	*isCons		= memory.alloc();
-	*isCons				= Special{.env = {}, .func = is_T<Cons>		};
-	Atom	*isReal		= memory.alloc();
-	*isReal				= Special{.env = {}, .func = is_T<Cons>		};
-	Atom	*isInteger	= memory.alloc();
-	*isInteger			= Special{.env = {}, .func = is_T<Real>		};
-	Atom	*isString	= memory.alloc();
-	*isString			= Special{.env = {}, .func = is_T<Integer>	};
-	Atom	*isSymbol	= memory.alloc();
-	*isSymbol			= Special{.env = {}, .func = is_T<String>	};
-	Atom	*isQuoted	= memory.alloc();
-	*isQuoted			= Special{.env = {}, .func = is_T<Symbol>	};
-	Atom	*isHashTable= memory.alloc();
-	*isHashTable		= Special{.env = {}, .func = is_T<Quoted>	};
-	Atom	*isInPort	= memory.alloc();
-	*isInPort			= Special{.env = {}, .func = is_T<HashTable>};
-	Atom	*isOutPort	= memory.alloc();
-	*isOutPort			= Special{.env = {}, .func = is_T<InPort>	};
-	Atom	*isClosure	= memory.alloc();
-	*isClosure			= Special{.env = {}, .func = is_T<OutPort>	};
-	Atom	*car	 	= memory.alloc();
-	*car			 	= Special{.env = {}, .func = get_car		};
-	Atom	*cdr	 	= memory.alloc();
-	*cdr			 	= Special{.env = {}, .func = get_cdr		};
-	Atom	*__if 	 	= memory.alloc();
-	*__if				= Special{.env = {}, .func = _if			};
-	Atom	*_error 	 	= memory.alloc();
-	*_error				= Special{.env = {}, .func = error			};
+	Atom *eof_func = allocate(Closure{.body = (Atom[]){Symbol{eof}}});
+	Atom *read_delims = register_atom("read-delimeters", Special{.func = read_delimeter,
+																 .env	= {{InternalSymbols::eof_func, eof_func}}});
 
+	Atom *unbalanced_paren_error_func = allocate(Closure{.body = (Atom[]){Call{.head = f_error, .args = {String{"Unbalanced Parentethies!"}}}}});
+	Atom *read_parenths = allocate(Closure{.body = (Atom[]){Call{.head = read_delims, .args = {Char{')'}}}}});
 	
-
+	Atom *unbalanced_bracs_error_func = allocate(Closure{.body = (Atom[]){Call{.head = f_error, .args = {String{"Unbalanced Brackets!"}}}}});
+	Atom *read_bracs = allocate(Closure{.body = (Atom[]){Call{.head = read_delims, .args = {Char{']'}}}}});
 	
-	Atom *eof_func = memory.alloc();
-	*eof_func      = Closure{.body = (Atom[]){Symbol{eof}}};
+	// Whitespace
+	Atom	*f_read_whitespace = allocate(Special{.func = read_whitespace});
+	Atom	*f_read_comment	   = allocate(Special{.func = read_comment});
+	Atom	*f_read_string	   = allocate(Special{.func = read_string});
+	Atom	*f_read_char	   = allocate(Special{.func = read_char});
 
-	// Read ()
-
-	Atom *closing = memory.alloc();
-	*closing = Char{')'};
-
-	Atom *unbalanced_paren_error_func = memory.alloc();
-	*unbalanced_paren_error_func = Closure{.body = (Atom[]){Call{.head = _error, .args = {String{"Unbalanced Parentethies!"}}}}};
-
-	Atom *read_parenths = memory.alloc();
-	*read_parenths	    = Special {
-	  .func = read_delimeter, .env = {
-	      {intern("closing"), closing},
-	      {intern("eof-func"), eof_func}
-	}
-	};
+	readTable = {{Char{')'}, unbalanced_paren_error_func},
+				 {Char{'('}, read_parenths},
+				 {Char{']'}, unbalanced_bracs_error_func},
+				 {Char{'['}, read_bracs},
+				 {Char{' '}, f_read_whitespace},
+				 {Char{'\t'}, f_read_whitespace},
+				 {Char{'\n'}, f_read_whitespace},
+				 {Char{';'}, f_read_comment},
+				 {Char{'"'}, f_read_string},
+				 {Char{'?'}, f_read_char}};
 	
-	readtable		 = memory.alloc();
-	*readtable		 = HashTable {
-	  .value = {
-	    {Char{')'}, unbalanced_paren_error_func},
-	    {Char{'('}, read_parenths},
-	    {Char{}}
-		}};
+	register_atom("*readtable*", HashTable(readTable));
 	
-
-
-	global = {
-		{intern("cons?"	 )	, isCons},
-		{intern("real?"	 )	, isReal},
-		{intern("int?"	 )	, isInteger},
-		{intern("string?"	 )	, isString},
-		{intern("symbol?"	 )	, isSymbol},
-		{intern("quoted?"	 )	, isQuoted},
-		{intern("hash?"	 )	, isHashTable},
-		{intern("in-port?" )	, isInPort},
-		{intern("out-port?")	, isOutPort},
-		{intern("closure?" )	, isClosure},
-		
-		{intern("car"	 )	, car},
-		{intern("cdr"	 )	, cdr},
-		{intern("if" 	 )	, __if},
-
-		{intern("*readtable*"), readtable},
-		{intern("*in-port*"		), in_port},
-		{intern("*out-port*"), out_port},
-	};
 }

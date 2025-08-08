@@ -6,7 +6,31 @@
 
 using namespace TTT;
 
+struct Printer {
+	std::ostream &out;
+	template <class T> void operator()(const LitImpl<T> &l) {
+		out << l.value;
+	}
+	template <class T> void operator()(const T &_) {
+		out << "[?]";
+	}
+	void operator()(const Cons &c) {
+		out << '(' << *c.car << ' ' << *c.cdr;
+	}
+	void operator()(const nil &c) {
+		out << "nil";
+	}
+	void operator()(const t &c) {
+		out << "t";
+	}
+	
+};
 
+
+std::ostream &operator<<(std::ostream &os, Atom const &m) {
+	m.visit(Printer{os});
+	return os;
+}    
 
 /****************************************************
  *					Literals						*
@@ -72,7 +96,7 @@ auto std::hash<Cons>::operator()(const Cons &c) -> size_t {
 }
 auto std::hash<HashTable>::operator()(const HashTable &ht) -> size_t {
 	size_t res = 0;
-	for (const auto &[k, v] : ht.value) {
+	for (const auto &[k, v] : *ht.value) {
 		hash_combine(res, k);		
 		hash_combine(res, v);
 	}
@@ -89,10 +113,10 @@ auto Cons::operator==(const Cons &other) const -> bool {
 
 
 void HashTable::mark_children(Memory &memory) const {
-	for(const auto &[k, v] : value) memory.mark(v);
+	for(const auto &[k, v] : *value) memory.mark(v);
 }
 
 auto HashTable::operator==(const HashTable &other) const -> bool {
-	return value == other.value;
+	return *value == *other.value;
 }
 

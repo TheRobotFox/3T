@@ -1,6 +1,7 @@
 #include "Atom.hpp"
 #include "Memory.hpp"
 #include <vector>
+#include <format>
 
 namespace TTT {
 	class Module {
@@ -8,11 +9,22 @@ namespace TTT {
 		std::unordered_map<std::string, SymbolId> name_symbol;
 		long gensyms = 0;
 
+		auto register_atom(const std::string &&name, Atom &&func) -> Atom* {
+			Atom *a = allocate(std::move(func));
+			global[intern(name)] = a;
+			return a;
+		}
+		auto allocate(const Atom &&atom) -> Atom * {
+			Atom *a = memory.alloc();
+			*a = atom;
+			return a;
+		}
+
 	public:
 		Env global;
 		
-		auto get_symbol_name(SymbolId s) -> std::string_view {
-			if(s < 0) return "#GENSYM";
+		auto get_symbol_name(SymbolId s) -> std::string {
+			if(s < 0) return std::format("#GENSYM{}", -s);
 			if(s >= (long long)symbols.size()) return "#UNKNOWNSYM";
 			return symbols[s];
 		}
@@ -30,11 +42,11 @@ namespace TTT {
 		// source File
 
 		Atom *body;
-		SymbolId eof = gensym();
-		Atom *readtable;
 		Atom *in_port;
 		Atom *out_port;
-		Atom *read;
+		Atom *f_read;
+
+		std::unordered_map<Atom, Atom*> readTable;
 
 		Memory memory;
 

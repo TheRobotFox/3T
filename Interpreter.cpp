@@ -10,7 +10,7 @@
 using namespace TTT;
 
 
-auto CallEval::operator()(const Symbol &sym, Atom *out) const -> bool {
+auto CallEval::operator()(const Symbol &sym) const -> bool {
 	if (env.contains(sym.id)){
 		*out = env.at(sym.id);
 		return true;
@@ -33,7 +33,6 @@ struct CallProc {
 		interp.error = std::format("Atom is not valid Function!");
 		return false;
 	}
-	
 	auto operator()(Closure &c) -> bool {
 		if (args.size() < c.args.size() ||
 			(args.size() > c.args.size() && c.rest == 0)) {
@@ -48,7 +47,6 @@ struct CallProc {
 		}
 		return interp.eval(*c.body, c.env, out);
 	}
-	
 	auto operator()(Macro &c) -> bool {
 		interp.error = "Macros Not Implemented!";
 		return false;
@@ -58,7 +56,7 @@ struct CallProc {
 	}
 };
 
-auto CallEval::operator()(const Call &call, Atom *out) const -> bool {
+auto CallEval::operator()(const Call &call) const -> bool {
 	Atom *fn;
 	if (!interp.eval(*call.head, env, fn))
 		return false;
