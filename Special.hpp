@@ -1,7 +1,6 @@
-#include "Interpreter.hpp"
+#include "Atom.hpp"
 #include <format>
 #include <functional>
-#include <variant>
 
 namespace TTT {
 
@@ -77,9 +76,10 @@ namespace TTT {
 	//	};
 
 	enum InternalSymbols : SymbolId {
-		eof	 = -1,
-		backup = -2,
-		eof_func=-3
+		eof				  = -1,
+		reader_unbalanced_error_fun = -2,
+		reader_closing_delim		  = -3,
+		reader_eof_func		  = -4,
 	};
 
 	auto argument_error(int expected, int got) -> std::string {
@@ -88,21 +88,7 @@ namespace TTT {
 
 	template <class T>
 	auto is_T(Interpreter &interp, Env &env, const std::vector<Atom> &args,
-			  Atom *out) -> bool {
-		if (args.size() != 1) {
-			interp.error = argument_error(1, args.size());
-			return false;
-		}
-		Atom *evaluated = interp.mod.memory.alloc();
-		if (!interp.eval(args[0], env, evaluated))
-			return false;
-		
-		if (std::holds_alternative<T>(evaluated))
-			*out = t{};
-		else 
-			*out = nil{};
-		return true;
-	}
+			  Atom *out) -> bool;
 	
 	auto error(Interpreter &interp, Env &env, const std::vector<Atom> &args,
 			   Atom *out) -> bool;

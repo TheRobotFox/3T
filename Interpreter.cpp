@@ -1,10 +1,11 @@
+#include "Interpreter.hpp"
+#include "Module.hpp"
 #include "Special.hpp"
 #include <algorithm>
 #include <cstddef>
 #include <format>
 #include <iterator>
 #include <utility>
-#include <variant>
 #include <vector>
 
 using namespace TTT;
@@ -12,11 +13,11 @@ using namespace TTT;
 
 auto CallEval::operator()(const Symbol &sym) const -> bool {
 	if (env.contains(sym.id)){
-		*out = env.at(sym.id);
+		*out = *env.at(sym.id);
 		return true;
 	}
 	if (interp.mod.global.contains(sym.id)){
-		*out = interp.mod.global.at(sym.id);
+		*out = *interp.mod.global.at(sym.id);
 		return true;
 	}
 	interp.error = std::format("Symbol %s is not in scope!", interp.mod.get_symbol_name(sym.id));

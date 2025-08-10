@@ -1,4 +1,5 @@
 #include "Atom.hpp"
+#include "Memory.hpp"
 #include "Interpreter.hpp"
 #include <cstddef>
 #include <format>

@@ -1,4 +1,6 @@
-#include "Module.hpp"
+#include "Atom.hpp"
+#include <cstddef>
+#include <vector>
 
 namespace TTT {
 
@@ -32,9 +34,11 @@ namespace TTT {
 	// };
 
 
+	struct Module;
 	struct Interpreter {
-		
+
 		Module &mod;
+		std::vector<typename Tp>
 		std::string error;
 		Interpreter(Module &mod)
 		: mod(mod)

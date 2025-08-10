@@ -7,7 +7,9 @@ struct structt {
 	
 };
 int main() {
-	Atom c,d;
-	c=d;
+	Atom c, d;
+	Atom *a = new Atom;
+	c = d;
+	*a=c;
 	return (int)(c==d);
 }

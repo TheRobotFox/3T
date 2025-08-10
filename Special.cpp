@@ -1,5 +1,7 @@
 #include "Special.hpp"
 #include "Atom.hpp"
+#include "Interpreter.hpp"
+#include "Module.hpp"
 #include <cctype>
 #include <cstddef>
 #include <cstdio>
@@ -19,6 +21,23 @@ auto error(Interpreter &interp, Env &env, const std::vector<Atom> &args,
 	return false;
 }
 
+template <class T>
+auto is_T(Interpreter &interp, Env &env, const std::vector<Atom> &args,
+		  Atom *out) -> bool {
+	if (args.size() != 1) {
+		interp.error = argument_error(1, args.size());
+		return false;
+	}
+	Atom *evaluated = interp.mod.memory.alloc();
+	if (!interp.eval(args[0], env, evaluated))
+		return false;
+		
+	if (std::holds_alternative<T>(evaluated))
+		*out = t{};
+	else 
+		*out = nil{};
+	return true;
+}
 
 auto get_car(Interpreter &interp, Env &env, const std::vector<Atom> &args, Atom *out)
 	-> bool {
@@ -65,24 +84,15 @@ auto _if(Interpreter &interp, Env &env, std::vector<Atom> &call, Atom *out)
 
 size_t depth = 0;
 
-void reset_reader(HashTable *readtable, Env &env) {
+bool reset_reader(std::unordered_map<Atom, Atom*> &readTable, Env &env) {
 	depth = 0;
-	if (env.contains(InternalSymbols::backup)) {
-		readtable->value[Char{')'}] = env[InternalSymbols::backup];
-		env.erase(InternalSymbols::backup);
-	}
+	readTable[Char{')'}] = env.at(InternalSymbols::reader_unbalanced_error_fun);
+	return false;
 }
 
 
 auto read_delimeter(Interpreter &interp, Env &env, const std::vector<Atom> &args,
 					Atom *out) -> bool {
-
-	HashTable *readtable;
-	if ((readtable = std::get_if<HashTable>(interp.mod.readtable)) == nullptr) {
-		interp.error = "Expected *readtable* to be an Table";
-		depth = 0;
-		return false;
-	}
 
 	// Parse Arguments
 	Char closing;
@@ -92,17 +102,10 @@ auto read_delimeter(Interpreter &interp, Env &env, const std::vector<Atom> &args
 		interp.error = "Expected Second Argument to be Char!";
 		return false;
 	}
-		
-	// Backup and set Readtable
-	if (readtable->value.contains(closing))
-		env[InternalSymbols::backup] = readtable->value[closing];
-	readtable->value[closing] = env[InternalSymbols::eof_func];
-
 
 	depth++;
 	
 	// Read Cons-Cells
-
 	*out = nil{};
 	Atom *current = out;
 
@@ -111,7 +114,7 @@ auto read_delimeter(Interpreter &interp, Env &env, const std::vector<Atom> &args
 		if (!interp.eval(Call{.head = interp.mod.f_read, .args = {}},
 						  interp.mod.global, car)){
 			depth = 0;
-			reset_reader(readtable, env);
+			reset_reader(interp.mod.readTable, env);
 			return false;
 		}
 		if (*car == Atom{Symbol{InternalSymbols::eof}})
@@ -124,7 +127,9 @@ auto read_delimeter(Interpreter &interp, Env &env, const std::vector<Atom> &args
 	}
 	
 	depth--;
-	if(depth == 0) reset_reader(readtable, env);
+	if (depth == 0) {
+		
+	}
 	return true;
 }
 

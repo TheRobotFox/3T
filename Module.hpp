@@ -49,6 +49,8 @@ namespace TTT {
 		std::unordered_map<Atom, Atom*> readTable;
 
 		Memory memory;
+		void init_readTable();
+
 
 		Module();
 	};

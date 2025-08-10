@@ -110,26 +110,26 @@ struct TTT::Symbol {
 struct TTT::InPort {
 	std::istream *value;
 	auto operator==(const InPort &other) const -> bool {
-	  return value == other.value;
+		return value == other.value;
 	}
 	~InPort(){delete value;}
 };
 struct TTT::OutPort {
 	std::ostream *value;
 	auto operator==(const OutPort &other) const -> bool{
-	  return value == other.value;
+		return value == other.value;
 	}
 	~OutPort(){delete value;}
 };
 
 template<> struct std::hash<Symbol> {
-  auto operator()(const Symbol &c)	-> size_t;	
+	auto operator()(const Symbol &c)	-> size_t;	
 };
 template<> struct std::hash<InPort> {
-  auto operator()(const InPort &c)	-> size_t;	
+	auto operator()(const InPort &c)	-> size_t;	
 };
 template<> struct std::hash<OutPort> {
-  auto operator()(const OutPort &c) -> size_t;
+	auto operator()(const OutPort &c) -> size_t;
 };
 
 
@@ -151,17 +151,17 @@ struct TTT::Closure {
 	Env env;
 	std::vector<SymbolId> args;
 	SymbolId rest;
-	auto operator==(const Closure &other) const -> bool = default;
+	auto operator==(const Closure &other) const -> bool {return body == other.body;}
 };
 struct TTT::Macro {
 	Atom *body;
 	Env env;
 	std::vector<SymbolId> args;
 	SymbolId rest;
-	auto operator==(const Macro   &other) const -> bool = default;
+	auto operator==(const Macro	  &other) const -> bool  {return body == other.body;}
 };
 struct TTT::Special {
-  std::function<bool(Interpreter &, Env &, const std::vector<Atom> &, Atom *)> func;
+	std::function<bool(Interpreter &, Env &, const std::vector<Atom> &, Atom *)> func;
 	Env env;
 	
 	auto operator==(const Special &other) const -> bool {
@@ -179,16 +179,16 @@ struct TTT::Call {
 
 
 template<> struct std::hash<Closure> {
-  auto operator()(const Closure &c) -> size_t;	
+	auto operator()(const Closure &c) -> size_t;	
 };
 template<> struct std::hash<Macro> {
-  auto operator()(const Macro &c)	-> size_t;	
+	auto operator()(const Macro &c)	-> size_t;	
 };
 template<> struct std::hash<Special> {
-  auto operator()(const Special &c) -> size_t;	
+	auto operator()(const Special &c) -> size_t;	
 };
 template<> struct std::hash<Call> {
-  auto operator()(const Call &c)	-> size_t;
+	auto operator()(const Call &c)	-> size_t;
 };
 
 
@@ -196,15 +196,15 @@ template<> struct std::hash<Call> {
 
 
 /****************************************************
- * 					Containers						*
+ *					Containers						*
  ****************************************************/
 
 template <> struct std::hash<Cons> {
-  auto operator()(const Cons &c) -> size_t;
+	auto operator()(const Cons &c) -> size_t;
 };
 
 template <> struct std::hash<HashTable> {
-  auto operator()(const HashTable &ht) -> size_t;
+	auto operator()(const HashTable &ht) -> size_t;
 };
 
 struct TTT::Cons {
@@ -214,28 +214,54 @@ struct TTT::Cons {
 };
 
 // struct TTT::Cons_iterator {
-// 	Atom *current;
-// 	auto next() -> Atom * {
-// 		if (auto *cons = std::get_if<Cons>(current)) {
-// 			current = cons->cdr;
-// 			return cons->car;
-// 		}
-// 		return nullptr;
-// 	}
-// 	auto count() -> size_t {
-// 		size_t length = 0;
-// 		while (next() != nullptr)
-// 			length++;
-// 		return length;
-// 	}
+//	Atom *current;
+//	auto next() -> Atom * {
+//		if (auto *cons = std::get_if<Cons>(current)) {
+//			current = cons->cdr;
+//			return cons->car;
+//		}
+//		return nullptr;
+//	}
+//	auto count() -> size_t {
+//		size_t length = 0;
+//		while (next() != nullptr)
+//			length++;
+//		return length;
+//	}
 // };
 
 struct TTT::HashTable {
+	HashTable(std::unordered_map<Atom, Atom *> &&value)
+	: value(new std::unordered_map(value)), own(true) {}
+	HashTable(std::unordered_map<Atom, Atom *> &value) : value(&value), own(false){}
+	HashTable(HashTable &&other) : value(other.value), own(other.own) {}
+	HashTable(const HashTable &other) : own(other.own) {
+		if (own)
+			value = new std::unordered_map(*other.value);
+		else
+			value = other.value;
+	}
+	auto operator=(const HashTable &other) noexcept -> HashTable & {
+		if (own)
+			value = new std::unordered_map(*other.value);
+		else
+			value = other.value;
+		
+		return *this;
+	}
+	auto operator=(HashTable &&other) noexcept -> HashTable & {
+		own = other.own;
+		value = other.value;
+		
+		return *this;
+	}
 	std::unordered_map<Atom, Atom *> *value;
 	bool own;
 	void mark_children(Memory &mem) const;
 	auto operator==(const HashTable &other) const -> bool;
-	~HashTable() { if(own) delete value; }
-	HashTable(std::unordered_map<Atom, Atom *> &&value) : value(new std::unordered_map(value)), own(true){}
-	HashTable(std::unordered_map<Atom, Atom *> &value) : value(&value), own(false){}
+	~HashTable() {
+		if (own)
+			delete value;
+	}
+
 };
