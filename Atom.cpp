@@ -1,8 +1,9 @@
 #include "Atom.hpp"
-#include "Memory.hpp"
 #include "Interpreter.hpp"
+#include "Module.hpp"
 #include <cstddef>
 #include <format>
+#include <variant>
 #include <vector>
 
 using namespace TTT;
@@ -12,11 +13,16 @@ struct Printer {
 	template <class T> void operator()(const LitImpl<T> &l) {
 		out << l.value;
 	}
-	template <class T> void operator()(const T &_) {
-		out << "[?]";
+	template <class T> void operator()(const T &a) {
+		out << "["<< typeid(T).name() << "]";
 	}
 	void operator()(const Cons &c) {
-		out << '(' << *c.car << ' ' << *c.cdr;
+		out << '(' << *c.car << ' ' << *c.cdr << ')';
+	}
+	void operator()(const Call &c) {
+		out << *c.head << "<--";
+		for (const Atom &a : c.args)
+			out << ' ' << a;
 	}
 	void operator()(const nil &c) {
 		out << "nil";

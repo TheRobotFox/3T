@@ -50,7 +50,7 @@ namespace TTT {
 	
 
 	using Atom =
-		std::variant<t, nil, String, Char, Integer, Real, Symbol, Quoted, Cons, HashTable,
+		std::variant<nil, t, String, Char, Integer, Real, Symbol, Quoted, Cons, HashTable,
 					 Closure, Macro, Special, Call, InPort, OutPort>;
 
 
@@ -112,14 +112,12 @@ struct TTT::InPort {
 	auto operator==(const InPort &other) const -> bool {
 		return value == other.value;
 	}
-	~InPort(){delete value;}
 };
 struct TTT::OutPort {
 	std::ostream *value;
 	auto operator==(const OutPort &other) const -> bool{
 		return value == other.value;
 	}
-	~OutPort(){delete value;}
 };
 
 template<> struct std::hash<Symbol> {
@@ -140,17 +138,11 @@ template<> struct std::hash<OutPort> {
  *					Procedures						*
  ****************************************************/
 
-struct Callable {
-	auto operator==(const Callable &other) const -> bool {
-		return this==&other;
-	}
-};
-
 struct TTT::Closure {
 	Atom *body; /* byte code */
 	Env env;
 	std::vector<SymbolId> args;
-	SymbolId rest;
+	SymbolId rest{0};
 	auto operator==(const Closure &other) const -> bool {return body == other.body;}
 };
 struct TTT::Macro {

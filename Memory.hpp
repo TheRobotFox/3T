@@ -5,9 +5,10 @@
 
 namespace TTT {
 
+
 	class Memory {
 		std::unique_ptr<Atom> heap;
-		size_t current;
+		size_t current {};
 	public:
 		auto alloc() -> Atom*;
 		void collect();

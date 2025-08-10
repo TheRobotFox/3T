@@ -12,7 +12,7 @@ using namespace TTT;
 
 
 Module::Module()
-: memory(1024 * 1024 * 100) // 100Mb
+: memory(1024 * 100) // 100Mb
 {
 	register_atom("cons?"		, Special{.func = is_T<Cons>		, .env = {}	});
 	register_atom("num?"		, Special{.func = is_T<Real>		, .env = {}	});
@@ -27,48 +27,52 @@ Module::Module()
 	register_atom("car"		, Special{.func = get_car			, .env = {} });
 	register_atom("cdr"		, Special{.func = get_cdr			, .env = {} });
 	register_atom("if"			, Special{.func = _if				, .env = {} });
-	register_atom("read"		, Special{.func = read				, .env = {} });
-	register_atom("error"		, Special{.func = error			, .env = {} });
+	f_read = register_atom("read"		, Special{.func = read				, .env = {} });
+	f_error = register_atom("error"		, Special{.func = error			, .env = {} });
 	
 	init_readTable();
 }
 
 void Module::init_readTable() {
-	Atom *f_error = global[intern("error")];
-	
-	Atom *eof_func = allocate(Closure{.body = (Atom[]){Symbol{eof}}});
-	Atom *read_delims = register_atom("read-delimeters", Special{.func = read_delimeter,
-																 .env	= {{InternalSymbols::reader_eof_func, eof_func}}});
 
-	Atom *unbalanced_paren_error_func = allocate(Closure{.body = (Atom[]){Call{.head = f_error, .args = {String{"Unbalanced Parentethies!"}}}}});
-	Atom *read_parenths = allocate(
-								   Closure{
-									   .body = (Atom[]) {
-										   Call {
-											   .head = read_delims, .args = {
-												   Char{')'}	  
-										   }}},
-									   .env	 = {
-										   {InternalSymbols::reader_unbalanced_error_fun,
-											unbalanced_paren_error_func}}});
+	Atom *eof_func = allocate(Closure{.body = allocate(Quoted{eof}), .env = {}, .args = {}});
+	Atom *read_delims = register_atom(
+	    "read-delimeters",
+	    Special{.func = read_delimeter,
+		    .env  = {
+				{InternalSymbols::reader_eof_func, eof_func},
+				{InternalSymbols::reader_backup_fun, nullptr}}});
 
-	Atom *unbalanced_brackets_error_func = allocate(Closure{.body = (Atom[]){Call{.head = f_error, .args = {String{"Unbalanced Brackets!"}}}}});
-	Atom *read_brackets =
-		allocate(Closure{.body = (Atom[]){Call{.head = read_delims,
-											   .args = {
-												   Char{']'},
-							   
-											   }}},
-						 .env  = {
-							 {InternalSymbols::reader_unbalanced_error_fun,
-							  unbalanced_brackets_error_func},
-							 {InternalSymbols::reader_closing_delim, allocate(Char{']'})}}});
+	Atom *unbalanced_paren_error_func = allocate(Call{.head = f_error, .args = {String{"Unbalanced Parentethies!"}}});
+	Atom *read_parenths =
+	    allocate(Closure{.body = allocate(Call{.head = read_delims,
+						   .args = {
+						       Char{')'},
+						       
+						  Closure{.body = unbalanced_paren_error_func,
+								  .env	= {},
+								  .args = {}},
+					  }}),
+		.env	 = {}, .args = {}});
+
+	Atom *unbalanced_brackets_error_func = allocate(Closure{.body = (Atom[]){Call{.head = f_error, .args = {String{"Unbalanced Brackets!"}}}}, .env = {}, .args = {}});
+	Atom *read_brackets = allocate(Closure{
+	    .body =
+		allocate(Call{.head = read_delims,
+					  .args = {
+						  Char{')'},
+						  Closure{.body = unbalanced_brackets_error_func,
+								  .env	= {},
+								  .args = {}},
+					  }}),
+		.env	 = {}, .args = {}});
+
 	
 	// Whitespace
-	Atom	*f_read_whitespace = allocate(Special{.func = read_whitespace});
-	Atom	*f_read_comment	   = allocate(Special{.func = read_comment});
-	Atom	*f_read_string	   = allocate(Special{.func = read_string});
-	Atom	*f_read_char	   = allocate(Special{.func = read_char});
+	Atom	*f_read_whitespace = allocate(Special{.func = read_whitespace, .env = {}});
+	Atom	*f_read_comment	   = allocate(Special{.func = read_comment, .env = {}});
+	Atom	*f_read_string	   = allocate(Special{.func = read_string, .env = {}});
+	Atom	*f_read_char	   = allocate(Special{.func = read_char, .env = {}});
 
 	readTable = {{Char{')'}, unbalanced_paren_error_func},
 				 {Char{'('}, read_parenths},

@@ -1,3 +1,4 @@
+#pragma once
 #include "Atom.hpp"
 #include "Memory.hpp"
 #include <vector>
@@ -45,6 +46,7 @@ namespace TTT {
 		Atom *in_port;
 		Atom *out_port;
 		Atom *f_read;
+		Atom *f_error;
 
 		std::unordered_map<Atom, Atom*> readTable;
 

@@ -1,5 +1,5 @@
-CXX = g++
-CPPFLAGS =  -std=c++26 # -Wall -Wextra -Wpedantic -ggdb -fsanitize=address
+CXX = clang++
+CPPFLAGS = -std=c++26 -ggdb -Wall #-Wextra -Wpedantic
 BUILD_DIR := build
 
 
@@ -7,7 +7,7 @@ SOURCE := Atom.cpp Interpreter.cpp Special.cpp Module.cpp Memory.cpp
 
 OBJECTS:= $(SOURCE:%=$(BUILD_DIR)/%.o)
 
-$(BUILD_DIR)/%.cpp.o: %.cpp
+$(BUILD_DIR)/%.cpp.o: %.cpp %.hpp
 	mkdir -p $(dir $@)
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $< -o $@
 

@@ -1,4 +1,5 @@
-#include "Atom.hpp"
+#include "Module.hpp"
+#include "Interpreter.hpp"
 #include <format>
 #include <functional>
 
@@ -77,18 +78,30 @@ namespace TTT {
 
 	enum InternalSymbols : SymbolId {
 		eof				  = -1,
-		reader_unbalanced_error_fun = -2,
-		reader_closing_delim		  = -3,
-		reader_eof_func		  = -4,
+		reader_backup_fun = -2,
+		reader_eof_func	  = -3,
 	};
 
-	auto argument_error(int expected, int got) -> std::string {
-		return std::format("Expected %d Arguments got");
-	}
+	auto argument_error(int expected, int got) -> std::string;
+
 
 	template <class T>
 	auto is_T(Interpreter &interp, Env &env, const std::vector<Atom> &args,
-			  Atom *out) -> bool;
+			  Atom *out) -> bool {
+		if (args.size() != 1) {
+			interp.error = argument_error(1, args.size());
+			return false;
+		}
+		Atom *evaluated = interp.mod.memory.alloc();
+		if (!interp.eval(args[0], env, evaluated))
+			return false;
+		
+		if (std::holds_alternative<T>(*evaluated))
+			*out = t{};
+		else 
+			*out = nil{};
+		return true;
+	}
 	
 	auto error(Interpreter &interp, Env &env, const std::vector<Atom> &args,
 			   Atom *out) -> bool;

@@ -1,7 +1,15 @@
 #include "Atom.hpp"
 #include "Interpreter.hpp"
+#include "Module.hpp"
 #include <iostream>
 #include <sstream>
+#include <string>
+
+std::string print(Atom &a) {
+	std::ostringstream out;
+	out << a;
+	return out.str();
+}
 
 int main(void) {
 
@@ -10,15 +18,17 @@ int main(void) {
 	Atom in;
 	mod.in_port = &in;
 	Interpreter intp(mod);
-	
+
 	while (true) {
+		std::cout << "> ";
 		std::string inp;
-		std::cin >> inp;
-		std::istringstream ss(inp);
-		in = InPort{.value = &ss};
+		std::getline(std::cin, inp);
+		in = InPort{.value = new std::istringstream(inp)};
 		Atom result;
-		intp.eval(Call{.head = mod.f_read}, mod.global, &result);
-		std::cout << result;
+		if (!intp.eval(Call{.head = mod.f_read, .args = {}}, mod.global,
+						&result)) {
+			std::cout << "Error: " << intp.error << '\n';
+		}else std::cout << result << '\n';
 	}
 	return 0;
 }

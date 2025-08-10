@@ -1,3 +1,4 @@
+#pragma once
 #include "Atom.hpp"
 #include <cstddef>
 #include <vector>
@@ -33,12 +34,10 @@ namespace TTT {
 
 	// };
 
-
 	struct Module;
 	struct Interpreter {
 
 		Module &mod;
-		std::vector<typename Tp>
 		std::string error;
 		Interpreter(Module &mod)
 		: mod(mod)

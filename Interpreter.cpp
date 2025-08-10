@@ -20,7 +20,7 @@ auto CallEval::operator()(const Symbol &sym) const -> bool {
 		*out = *interp.mod.global.at(sym.id);
 		return true;
 	}
-	interp.error = std::format("Symbol %s is not in scope!", interp.mod.get_symbol_name(sym.id));
+	interp.error = std::format("Symbol {} is not in scope!", interp.mod.get_symbol_name(sym.id));
 	return false;
 }
 
@@ -53,14 +53,14 @@ struct CallProc {
 		return false;
 	}
 	auto operator()(Special &c) -> bool {
-		return c.func(interp, env, args, out);
+		return c.func(interp, c.env, args, out);
 	}
 };
 
 auto CallEval::operator()(const Call &call) const -> bool {
-	Atom *fn;
-	if (!interp.eval(*call.head, env, fn))
+	Atom fn;
+	if (!interp.eval(*call.head, env, &fn))
 		return false;
 	
-	return fn->visit(CallProc{.interp=interp, .env=env, .args= call.args, .out = out});
+	return fn.visit(CallProc{.interp=interp, .env=env, .args= call.args, .out = out});
 }
