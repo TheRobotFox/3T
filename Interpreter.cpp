@@ -1,9 +1,11 @@
 #include "Interpreter.hpp"
 #include "Module.hpp"
+#include "Printer.hpp"
 #include "Special.hpp"
 #include <algorithm>
 #include <cstddef>
 #include <format>
+#include <iostream>
 #include <iterator>
 #include <utility>
 #include <vector>
@@ -12,6 +14,7 @@ using namespace TTT;
 
 
 auto CallEval::operator()(const Symbol &sym) const -> bool {
+	
 	if (env.contains(sym.id)){
 		*out = *env.at(sym.id);
 		return true;
@@ -31,7 +34,7 @@ struct CallProc {
 	Atom *out;
 	
 	template<class T> auto operator()(T &c) -> bool {
-		interp.error = std::format("Atom is not valid Function!");
+		interp.error = std::format("Atom {} is not valid Function!", typeid(c).name());
 		return false;
 	}
 	auto operator()(Closure &c) -> bool {
@@ -44,8 +47,9 @@ struct CallProc {
 		for (size_t i = 0; i < args.size(); i++) {
 			Atom *arg = interp.mod.memory.alloc();
 			if (!interp.eval(args[i], env, arg)) return false;
-			c.env[ c.args[i] ] = arg;
+			c.env[c.args[i]] = arg;
 		}
+
 		return interp.eval(*c.body, c.env, out);
 	}
 	auto operator()(Macro &c) -> bool {
@@ -53,7 +57,7 @@ struct CallProc {
 		return false;
 	}
 	auto operator()(Special &c) -> bool {
-		return c.func(interp, c.env, args, out);
+		return c.func(interp, env, c.env, args, out);
 	}
 };
 

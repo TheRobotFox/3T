@@ -1,7 +1,10 @@
 #include "Module.hpp"
 #include "Interpreter.hpp"
+#include "Printer.hpp"
+
 #include <format>
 #include <functional>
+#include <sstream>
 
 namespace TTT {
 
@@ -86,14 +89,14 @@ namespace TTT {
 
 
 	template <class T>
-	auto is_T(Interpreter &interp, Env &env, const std::vector<Atom> &args,
+	auto is_T(Interpreter &interp, Env &called_from, Env &_, const std::vector<Atom> &args,
 			  Atom *out) -> bool {
 		if (args.size() != 1) {
 			interp.error = argument_error(1, args.size());
 			return false;
 		}
 		Atom *evaluated = interp.mod.memory.alloc();
-		if (!interp.eval(args[0], env, evaluated))
+		if (!interp.eval(args[0], called_from, evaluated))
 			return false;
 		
 		if (std::holds_alternative<T>(*evaluated))
@@ -103,27 +106,75 @@ namespace TTT {
 		return true;
 	}
 	
-	auto error(Interpreter &interp, Env &env, const std::vector<Atom> &args,
+	auto error(Interpreter &interp, Env &_, Env &env, const std::vector<Atom> &args,
 			   Atom *out) -> bool;
 	
-	auto get_car(Interpreter &interp, Env &env, const std::vector<Atom> &args, Atom *out) -> bool;
-	auto get_cdr(Interpreter &interp, Env &env, const std::vector<Atom> &args,
+	auto get_car(Interpreter &interp, Env &_, Env &env, const std::vector<Atom> &args, Atom *out) -> bool;
+	auto get_cdr(Interpreter &interp, Env &_, Env &env, const std::vector<Atom> &args,
 				 Atom *out) -> bool;
 
-	auto _if(Interpreter &interp, Env &env, const std::vector<Atom> &args,
+	auto _if(Interpreter &interp, Env &_, Env &env, const std::vector<Atom> &args,
 			 Atom *out) -> bool;
 
-	auto read_delimeter		(Interpreter &interp, Env &env, const std::vector<Atom> &call, Atom *out) -> bool;
-	auto read_whitespace	(Interpreter &interp, Env &env, const std::vector<Atom> &args, Atom *out) -> bool;
-	auto read_comment		(Interpreter &interp, Env &env, const std::vector<Atom> &args, Atom *out) -> bool;
-	auto read_string		(Interpreter &interp, Env &env, const std::vector<Atom> &args, Atom *out) -> bool;
-	auto read_char			(Interpreter &interp, Env &env, const std::vector<Atom> &args, Atom *out) -> bool;
-	auto read				(Interpreter &interp, Env &env, const std::vector<Atom> &args, Atom *out) -> bool;
+	auto read_delimeter		(Interpreter &interp, Env &_, Env &env, const std::vector<Atom> &call, Atom *out) -> bool;
+	auto read_whitespace	(Interpreter &interp, Env &_, Env &env, const std::vector<Atom> &args, Atom *out) -> bool;
+	auto read_comment		(Interpreter &interp, Env &_, Env &env, const std::vector<Atom> &args, Atom *out) -> bool;
+	auto read_string		(Interpreter &interp, Env &_, Env &env, const std::vector<Atom> &args, Atom *out) -> bool;
+	auto read_char			(Interpreter &interp, Env &_, Env &env, const std::vector<Atom> &args, Atom *out) -> bool;
+	auto read				(Interpreter &interp, Env &_, Env &env, const std::vector<Atom> &args, Atom *out) -> bool;
 
-	auto eval(Interpreter &interp, Env &env, const std::vector<Atom> &args,
+	auto eval(Interpreter &interp, Env &_, Env &env, const std::vector<Atom> &args,
 			  Atom *out) -> bool;
-	auto list(Interpreter &interp, Env &env, const std::vector<Atom> &args,
+	auto list(Interpreter &interp, Env &_, Env &env, const std::vector<Atom> &args,
 			  Atom *out) -> bool;
-	auto quote(Interpreter &interp, Env &env, const std::vector<Atom> &args,
+	auto quote(Interpreter &interp, Env &_, Env &env, const std::vector<Atom> &args,
 			   Atom *out) -> bool;
+	auto define(Interpreter &interp, Env &_, Env &env,
+				const std::vector<Atom> &args, Atom *out) -> bool;
+	auto lambda(Interpreter &interp, Env &_, Env &env,
+				const std::vector<Atom> &args, Atom *out) -> bool;
+	auto cons(Interpreter &interp, Env &_, Env &env,
+			  const std::vector<Atom> &args, Atom *out) -> bool;
+	auto set(Interpreter &interp, Env &called_from, Env &_,
+			 const std::vector<Atom> &args, Atom *out) -> bool;
+
+
+	template <class Op>
+	auto make_op(Op &&fn)
+	    -> std::function<bool(Interpreter &, Env &, Env &,
+						   const std::vector<Atom> &, Atom *)> {
+	  return [fn](Interpreter &interp, Env &called_from, Env &_,
+		     const std::vector<Atom> &args, Atom *out) -> bool {
+	      long long ires = 0;
+	      double rres    = 0;
+	      bool exact = true;
+			for (const Atom &a : args) {
+				Atom evaled;
+				if (!interp.eval(a, called_from, &evaled))
+					return false;
+				if (const auto *i =
+				std::get_if<Integer>(&evaled)) {
+					ires = fn(ires, i->value);
+					rres = fn(rres, i->value);
+				} else if (const auto *r =
+				std::get_if<Real>(&evaled)) {
+					rres = fn(rres, r->value);
+					exact = false;
+				} else {
+					std::ostringstream os;
+					os << "Operator only accepts Number inputs! Got ";
+					evaled.visit(Printer(os, &interp.mod));
+					interp.error = os.str();
+					return false;
+				}
+			}
+			if (exact)
+				*out = Integer{.value = ires};
+			else
+				*out = Real{.value = rres};
+
+			return true;
+		};
+	}
+	
 }

@@ -156,7 +156,7 @@ struct TTT::Macro {
 	auto operator==(const Macro	  &other) const -> bool  {return body == other.body;}
 };
 struct TTT::Special {
-	std::function<bool(Interpreter &, Env &, const std::vector<Atom> &, Atom *)> func;
+	std::function<bool(Interpreter &, Env &, Env &, const std::vector<Atom> &, Atom *)> func;
 	Env env;
 	
 	auto operator==(const Special &other) const -> bool {

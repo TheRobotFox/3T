@@ -27,11 +27,23 @@ Module::Module()
 	register_atom("car"		, Special{.func = get_car			, .env = {} });
 	register_atom("cdr"		, Special{.func = get_cdr			, .env = {} });
 	register_atom("if"			, Special{.func = _if				, .env = {} });
-	register_atom("list"			, Special{.func = list				, .env = {} });
-	register_atom("quote"			, Special{.func = quote				, .env = {} });
-	f_read = register_atom("read"		, Special{.func = read				, .env = {} });
-	f_error = register_atom("error"		, Special{.func = error			, .env = {} });
-	f_eval = register_atom("eval"		, Special{.func = eval			, .env = {} });
+	register_atom("list"		, Special{.func = list				, .env = {} });
+	register_atom("cons"			, Special{.func = cons					, .env = {} });
+	register_atom("quote"		, Special{.func = quote			, .env = {} });
+	register_atom("define"		, Special{.func = define			, .env = {} });
+	register_atom("lambda"		, Special{.func = lambda			, .env = {} });
+	register_atom("set", Special{.func = set, .env = {}});
+	
+	register_atom("+"		, Special{.func = make_op([](auto a, auto b){return a+b;})			, .env = {} });
+	register_atom("*"		, Special{.func = make_op([](auto a, auto b){return a*b;})			, .env = {} });
+	register_atom("/"		, Special{.func = make_op([](auto a, auto b){return a/b;})			, .env = {} });
+	register_atom("-",
+		      Special{.func = make_op([](auto a, auto b) { return a - b; }),
+					  .env  = {}});
+	
+	f_read = register_atom("read"		, Special{.func = read		, .env = {} });
+	f_error = register_atom("error"	, Special{.func = error	, .env = {} });
+	f_eval = register_atom("eval"		, Special{.func = eval		, .env = {} });
 	
 	init_readTable();
 }
@@ -86,7 +98,7 @@ void Module::init_readTable() {
 				 {Char{'\n'}, f_read_whitespace},
 				 {Char{';'}, f_read_comment},
 				 {Char{'"'}, f_read_string},
-				 {Char{'?'}, f_read_char}};
+				 {Char{'#'}, f_read_char}};
 	
 	register_atom("*readtable*", HashTable(readTable));
 }

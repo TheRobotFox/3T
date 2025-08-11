@@ -42,7 +42,7 @@ struct Printer {
 			out << "[Unknown Symbol " << c.id << "]";
 	}
 	void operator()(const Quoted &c) {
-		for (unsigned int i = 0; i < c.depth; i++)
+		for (unsigned int i = 0; i <= c.depth; i++)
 			out << "'";
 		this->operator()(Symbol{c.sym});
 	}

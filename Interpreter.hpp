@@ -34,7 +34,7 @@ namespace TTT {
 
 	// };
 
-	struct Module;
+	class Module;
 	struct Interpreter {
 
 		Module &mod;

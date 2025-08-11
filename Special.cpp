@@ -1,6 +1,5 @@
 #include "Special.hpp"
 #include "Atom.hpp"
-#include "Module.hpp"
 #include <cctype>
 #include <cstddef>
 #include <cstdio>
@@ -8,12 +7,13 @@
 #include <iostream>
 #include <variant>
 
+
 namespace TTT {
 
 	auto argument_error(int expected, int got) -> std::string {
 		return std::format("Expected {} Arguments got {}", expected, got);
 	}
-	auto error(Interpreter &interp, Env &env, const std::vector<Atom> &args,
+	auto error(Interpreter &interp, Env &_, Env &env, const std::vector<Atom> &args,
 			   Atom *out) -> bool {
 
 		const String *msg;
@@ -26,13 +26,13 @@ namespace TTT {
 		return false;
 	}
 
-	auto get_car(Interpreter &interp, Env &env, const std::vector<Atom> &args, Atom *out)
+	auto get_car(Interpreter &interp, Env &called_from, Env &env, const std::vector<Atom> &args, Atom *out)
 	-> bool {
 		if (args.size() != 1) {
 			interp.error = argument_error(1, args.size());
 			return false;
 		}
-		if (!interp.eval(args[0], env, out))
+		if (!interp.eval(args[0], called_from, out))
 			return false;
 		if (auto *cons = std::get_if<Cons>(out)) {
 			*out = *cons->car;
@@ -42,13 +42,13 @@ namespace TTT {
 		return false;
 	}
 
-	auto get_cdr(Interpreter &interp, Env &env, const std::vector<Atom>& args, Atom *out)
+	auto get_cdr(Interpreter &interp, Env &called_from, Env &env, const std::vector<Atom>& args, Atom *out)
 	-> bool {
 		if (args.size() != 1) {
 			interp.error = argument_error(1, args.size());
 			return false;
 		}
-		if (!interp.eval(args[0], env, out))
+		if (!interp.eval(args[0], called_from, out))
 			return false;
 		if (auto *cons = std::get_if<Cons>(out)) {
 			*out = *cons->cdr;
@@ -58,15 +58,15 @@ namespace TTT {
 		return false;
 	}
 	
-	auto _if(Interpreter &interp, Env &env, const std::vector<Atom> &args, Atom *out)
+	auto _if(Interpreter &interp, Env &called_from, Env &env, const std::vector<Atom> &args, Atom *out)
 	-> bool {
 		if (args.size() != 3) {
 			interp.error = argument_error(3, args.size());
 			return false;
 		}
-		if (!interp.eval(args[0], env, out))
+		if (!interp.eval(args[0], called_from, out))
 			return false;
-		return interp.eval(args[ std::holds_alternative<nil>(*out) ? 2 : 1], env, out);
+		return interp.eval(args[ std::holds_alternative<nil>(*out) ? 2 : 1], called_from, out);
 	}
 
 
@@ -74,7 +74,7 @@ namespace TTT {
 
 	// Args [closing_char, unbalanced_delimeter_error_function]
 	// Env [eof_returning_function]
-	auto read_delimeter(Interpreter &interp, Env &env, const std::vector<Atom> &args,
+	auto read_delimeter(Interpreter &interp, Env &called_from, Env &env, const std::vector<Atom> &args,
 						Atom *out) -> bool {
 
 		if (args.size() != 2) {
@@ -131,7 +131,7 @@ namespace TTT {
 		return ret;
 	}
 
-	auto read_whitespace(Interpreter &interp, Env &env,
+	auto read_whitespace(Interpreter &interp, Env &called_from, Env &env,
 						 const std::vector<Atom> &args, Atom *out) -> bool {
 		InPort *inp;
 		if ((inp = std::get_if<InPort>(interp.mod.in_port)) == nullptr) {
@@ -150,7 +150,7 @@ namespace TTT {
 					  interp.mod.global, out);
 	}
 
-	auto read_comment(Interpreter &interp, Env &env, const std::vector<Atom> &args,
+	auto read_comment(Interpreter &interp, Env &called_from, Env &env, const std::vector<Atom> &args,
 					  Atom *out) -> bool {
 		InPort *inp;
 		if ((inp = std::get_if<InPort>(interp.mod.in_port)) == nullptr) {
@@ -163,7 +163,7 @@ namespace TTT {
 					  interp.mod.global, out);	
 	}
 
-	auto read_string(Interpreter &interp, Env &env,
+	auto read_string(Interpreter &interp, Env &called_from, Env &env,
 					 const std::vector<Atom> &args, Atom *out) -> bool {
 		InPort *inp;
 		if ((inp = std::get_if<InPort>(interp.mod.in_port)) == nullptr) {
@@ -184,7 +184,7 @@ namespace TTT {
 		return true;
 	}
 
-	auto read_char(Interpreter &interp, Env &env, const std::vector<Atom> &args,
+	auto read_char(Interpreter &interp, Env &called_from, Env &env, const std::vector<Atom> &args,
 				   Atom *out) -> bool {
 		InPort *inp;
 		if ((inp = std::get_if<InPort>(interp.mod.in_port)) == nullptr) {
@@ -196,7 +196,7 @@ namespace TTT {
 		return true;
 	}
 
-	auto read(Interpreter &interp, Env &env, const std::vector<Atom> &args,
+	auto read(Interpreter &interp, Env &called_from, Env &env, const std::vector<Atom> &args,
 			  Atom *out) -> bool {
 		auto &readTable = interp.mod.readTable;
 		InPort *inp;
@@ -226,9 +226,10 @@ namespace TTT {
 			std::string num {c};
 			while (true) {
 				c = inp->value->peek();
-				if ((isdigit(c) != 0) || (c == '.' && !real)) 
+				if ((isdigit(c) != 0) || (c == '.' && !real)) {
 					num += inp->value->get();
-				else 
+					if(c=='.') real = true;
+				} else 
 					break;
 			}
 			if (real)
@@ -256,20 +257,21 @@ namespace TTT {
 		Interpreter &interp;
 		const Atom &self;
 		Atom *out;
+		Env &env;
 		bool evaled = false;
 
 		template <class T> auto operator()(const T &_) const -> bool {
 			if (!evaled){
-				if (!interp.eval(self, interp.mod.global, out))
+				if (!interp.eval(self, env, out))
 					return false;
 				
-				return out->visit(Quoting{.interp = interp, .self = *out, .out = out, .evaled = true});
+				return out->visit(Quoting{.interp = interp, .self = *out, .out = out, .env = env, .evaled = true});
 			}
 			*out = self;
 			return true;
 		}
 		auto operator()(const Symbol &sym) const -> bool {
-			*out = Quoted{.sym = sym.id, .depth = 1};
+			*out = Quoted{.sym = sym.id, .depth = 0};
 			return true;			
 		}
 		auto operator()(const Quoted &q) const -> bool {
@@ -278,24 +280,24 @@ namespace TTT {
 		}
 	};
 
-	auto quote(Interpreter &interp, Env &env, const std::vector<Atom> &args,
+	auto quote(Interpreter &interp, Env &called_from, Env &env, const std::vector<Atom> &args,
 			   Atom *out) -> bool {
 		if (args.size() != 1) {
 			interp.error = argument_error(1, args.size());
 			return false;
 		}
 
-		args[0].visit(Quoting{interp, args[0], out, false});
+		args[0].visit(Quoting{interp, args[0], out, called_from, false});
 		return true;
 	}
 
-	auto list(Interpreter &interp, Env &env, const std::vector<Atom> &args,
+	auto list(Interpreter &interp, Env &called_from, Env &env, const std::vector<Atom> &args,
 			  Atom *out) -> bool {
 		Atom *current = out;
 		*current = nil{};
 		for (const Atom &a : args) {
 			Atom *car = interp.mod.memory.alloc();
-			if (!interp.eval(a, interp.mod.global, car))
+			if (!interp.eval(a, called_from, car))
 				return false;
 			Atom *next = interp.mod.memory.alloc();
 			*current   = Cons{car, next};
@@ -317,7 +319,9 @@ namespace TTT {
 			return true;
 		}
 		auto operator()(const Cons &c) const -> bool {
-			Atom *fn = c.car;
+			Atom *fn = interp.mod.memory.alloc();
+
+			if(!c.car->visit(Eval{.interp =interp, .self = *c.car, .out = fn})) return false;
 
 			std::vector<Atom> args;
 
@@ -342,7 +346,7 @@ namespace TTT {
 		}
 	};
 
-	auto eval(Interpreter &interp, Env &env, const std::vector<Atom> &args,
+	auto eval(Interpreter &interp, Env &called_from, Env &_, const std::vector<Atom> &args,
 			  Atom *out) -> bool {
 		if (args.size() != 1) {
 			interp.error = argument_error(1, args.size());
@@ -352,7 +356,89 @@ namespace TTT {
 		if(!interp.eval(args[0], interp.mod.global, &evaled)) return false;
 		evaled.visit(
 					 Eval{.interp = interp, .self = evaled, .out = &evaled});
-		return interp.eval(evaled, interp.mod.global, out);
+		return interp.eval(evaled, called_from, out);
+	}
+
+	auto define(Interpreter &interp, Env &called_from, Env &_, const std::vector<Atom> &args,
+				Atom *out) -> bool {
+		if (args.size() != 2) {
+			interp.error = argument_error(2, args.size());
+			return false;
+		}
+		if (const auto *sym = std::get_if<Symbol>(&args.at(0))) {
+			Atom *evaled = interp.mod.memory.alloc();
+			if(!interp.eval(args[1], called_from, evaled)) return false;
+			called_from[sym->id] = evaled;
+			*out = nil{};
+			return true;
+		}
+		interp.error = "First Argument must be a Symbol";
+		return false;
+	}
+	auto lambda(Interpreter &interp, Env &called_from, Env &env,
+				const std::vector<Atom> &args, Atom *out) -> bool {
+		if (args.empty()) {
+			interp.error = "Expected at least one Argument";
+			return false;
+		}
+		if (const auto *arg_list = std::get_if<Call>(&args.at(0))) {
+			std::vector<SymbolId> arglist;
+			arglist.reserve(arg_list->args.size() + 1);
+
+			
+			auto get_sym = [&arglist, &interp](const Atom *a) {
+				if (const auto *sym = std::get_if<Symbol>(a)) {
+					arglist.push_back(sym->id);
+					return true;
+				}
+				interp.error =
+					"Lambda ArgumentList must only contain Symbols!";
+				return false;
+			};
+
+			if(!get_sym(arg_list->head)) return false;
+			for (const auto &a : arg_list->args)
+			  if (!get_sym(&a))
+			      return false;
+
+			Atom *body = interp.mod.memory.alloc();
+			*body = args[1];
+			*out	   = Closure{.body = body,
+					     .env  = called_from,
+					     .args = std::move(arglist)};
+			return true;
+		}
+		interp.error = "First Argument must be argument list";
+		return false;
+	}
+	auto cons(Interpreter &interp, Env &called_from, Env &_,
+			  const std::vector<Atom> &args, Atom *out) -> bool {
+		if (args.size() != 2) {
+			interp.error = argument_error(2, args.size());
+			return false;
+		}
+		
+		Atom *car = interp.mod.memory.alloc();
+		if(!interp.eval(args[0], called_from, car)) return false;
+		Atom *cdr = interp.mod.memory.alloc();
+		if (!interp.eval(args[1], called_from, cdr))
+			return false;
+		*out = Cons{car, cdr};
+		return true;
+	}
+	auto set(Interpreter &interp, Env &called_from, Env &_,
+			 const std::vector<Atom> &args, Atom *out) -> bool {
+		if (args.size() != 2) {
+			interp.error = argument_error(2, args.size());
+			return false;
+		}
+		*out = nil{};
+		if (const auto *sym = std::get_if<Symbol>(&args.at(0)))
+			return interp.eval(args[1], called_from,
+						  called_from[sym->id]);
+		
+		interp.error = "First Argument must be a Symbol";
+		return false;
 	}
 	  
 }
