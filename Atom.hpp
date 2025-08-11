@@ -23,7 +23,6 @@ namespace TTT {
 	using	Char	= LitImpl<char>;
 	using	Integer = LitImpl<long long>;
 	using	Real	= LitImpl<double>;
-	using	Quoted	= LitImpl<SymbolId>;
 
 
 	// Containers
@@ -46,7 +45,7 @@ namespace TTT {
 	struct InPort;
 	struct OutPort;
 	struct Symbol;
-
+	struct Quoted;
 	
 
 	using Atom =
@@ -59,11 +58,6 @@ namespace TTT {
 
 } // namespace TTT
 using namespace TTT;
-
-
-struct Printer;
-std::ostream &operator<<(std::ostream &os, Atom const &m);
-
 
 
 
@@ -107,6 +101,12 @@ struct TTT::Symbol {
 	auto operator==(const Symbol &other) const -> bool = default;
 };
 
+struct TTT::Quoted {
+	SymbolId sym;
+	unsigned int depth;
+	auto operator==(const Quoted &other) const -> bool = default;
+};
+
 struct TTT::InPort {
 	std::istream *value;
 	auto operator==(const InPort &other) const -> bool {
@@ -122,6 +122,9 @@ struct TTT::OutPort {
 
 template<> struct std::hash<Symbol> {
 	auto operator()(const Symbol &c)	-> size_t;	
+};
+template<> struct std::hash<Quoted> {
+	auto operator()(const Quoted &c)	-> size_t;	
 };
 template<> struct std::hash<InPort> {
 	auto operator()(const InPort &c)	-> size_t;	

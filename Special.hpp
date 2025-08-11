@@ -120,4 +120,10 @@ namespace TTT {
 	auto read_char			(Interpreter &interp, Env &env, const std::vector<Atom> &args, Atom *out) -> bool;
 	auto read				(Interpreter &interp, Env &env, const std::vector<Atom> &args, Atom *out) -> bool;
 
+	auto eval(Interpreter &interp, Env &env, const std::vector<Atom> &args,
+			  Atom *out) -> bool;
+	auto list(Interpreter &interp, Env &env, const std::vector<Atom> &args,
+			  Atom *out) -> bool;
+	auto quote(Interpreter &interp, Env &env, const std::vector<Atom> &args,
+			   Atom *out) -> bool;
 }

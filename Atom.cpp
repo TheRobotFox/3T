@@ -1,6 +1,5 @@
-#include "Atom.hpp"
 #include "Interpreter.hpp"
-#include "Module.hpp"
+#include "Printer.hpp"
 #include <cstddef>
 #include <format>
 #include <variant>
@@ -8,36 +7,22 @@
 
 using namespace TTT;
 
-struct Printer {
-	std::ostream &out;
-	template <class T> void operator()(const LitImpl<T> &l) {
-		out << l.value;
-	}
-	template <class T> void operator()(const T &a) {
-		out << "["<< typeid(T).name() << "]";
-	}
-	void operator()(const Cons &c) {
-		out << '(' << *c.car << ' ' << *c.cdr << ')';
-	}
-	void operator()(const Call &c) {
-		out << *c.head << "<--";
-		for (const Atom &a : c.args)
-			out << ' ' << a;
-	}
-	void operator()(const nil &c) {
-		out << "nil";
-	}
-	void operator()(const t &c) {
-		out << "t";
-	}
-	
-};
 
 
 std::ostream &operator<<(std::ostream &os, Atom const &m) {
 	m.visit(Printer{os});
 	return os;
-}    
+}
+
+
+template <class T>
+inline void hash_combine(std::size_t& seed, const T& v)
+{
+	std::hash<T> hasher;
+	seed ^= hasher(v) + 0x9e3779b9 + (seed<<6) + (seed>>2);
+}
+
+
 
 /****************************************************
  *					Literals						*
@@ -52,6 +37,11 @@ std::ostream &operator<<(std::ostream &os, Atom const &m) {
 
 auto std::hash<Symbol>::operator()(const Symbol &c)		-> size_t {
 	return std::hash<SymbolId>{}(c.id);
+}
+auto std::hash<Quoted>::operator()(const Quoted &c) -> size_t {
+	size_t res = std::hash<SymbolId>{}(c.sym);
+	hash_combine(res, c.depth);
+	return res;
 }
 auto std::hash<InPort>::operator()(const InPort &c)		-> size_t {
 	return std::hash<size_t>{}((size_t)&c);
@@ -88,13 +78,6 @@ auto std::hash<Call>::operator()(const Call &c)			-> size_t {
 /****************************************************
  * 					Containers						*
  ****************************************************/
-
-template <class T>
-inline void hash_combine(std::size_t& seed, const T& v)
-{
-	std::hash<T> hasher;
-	seed ^= hasher(v) + 0x9e3779b9 + (seed<<6) + (seed>>2);
-}
 
 auto std::hash<Cons>::operator()(const Cons &c) -> size_t {
 	size_t res = std::hash<Atom>{}(*c.car);

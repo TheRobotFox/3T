@@ -201,7 +201,7 @@ namespace TTT {
 		auto &readTable = interp.mod.readTable;
 		InPort *inp;
 		if ((inp = std::get_if<InPort>(interp.mod.in_port)) ==
-		    nullptr) {
+			nullptr) {
 			interp.error = "Stdin Port is not a InPort!";
 			return false;
 		}
@@ -251,4 +251,108 @@ namespace TTT {
 		*out = Symbol{interp.mod.intern(symbol)};
 		return true;
 	}
+
+	struct Quoting {
+		Interpreter &interp;
+		const Atom &self;
+		Atom *out;
+		bool evaled = false;
+
+		template <class T> auto operator()(const T &_) const -> bool {
+			if (!evaled){
+				if (!interp.eval(self, interp.mod.global, out))
+					return false;
+				
+				return out->visit(Quoting{.interp = interp, .self = *out, .out = out, .evaled = true});
+			}
+			*out = self;
+			return true;
+		}
+		auto operator()(const Symbol &sym) const -> bool {
+			*out = Quoted{.sym = sym.id, .depth = 1};
+			return true;			
+		}
+		auto operator()(const Quoted &q) const -> bool {
+			*out = Quoted{.sym = q.sym, .depth = q.depth + 1};
+			return true;			
+		}
+	};
+
+	auto quote(Interpreter &interp, Env &env, const std::vector<Atom> &args,
+			   Atom *out) -> bool {
+		if (args.size() != 1) {
+			interp.error = argument_error(1, args.size());
+			return false;
+		}
+
+		args[0].visit(Quoting{interp, args[0], out, false});
+		return true;
+	}
+
+	auto list(Interpreter &interp, Env &env, const std::vector<Atom> &args,
+			  Atom *out) -> bool {
+		Atom *current = out;
+		*current = nil{};
+		for (const Atom &a : args) {
+			Atom *car = interp.mod.memory.alloc();
+			if (!interp.eval(a, interp.mod.global, car))
+				return false;
+			Atom *next = interp.mod.memory.alloc();
+			*current   = Cons{car, next};
+			current	   = next;
+		}
+		return true;
+	}
+
+	struct Eval {
+		Interpreter &interp;
+		const Atom &self;
+		Atom *out;
+
+		auto operator()(const Quoted &q) const -> bool {
+			if(q.depth == 0)
+				*out = Symbol{q.sym};
+			else
+				*out = Quoted{.sym = q.sym, .depth = q.depth -1};
+			return true;
+		}
+		auto operator()(const Cons &c) const -> bool {
+			Atom *fn = c.car;
+
+			std::vector<Atom> args;
+
+			Atom *current = c.cdr;
+			while (auto *c = std::get_if<Cons>(current)) {
+				args.push_back(nil{});
+				if (!c->car->visit(Eval{.interp =interp, .self = *c->car, .out = &args.back()})) return false;
+					
+				current = c->cdr;
+			}
+			if (!std::holds_alternative<nil>(*current)) {
+				interp.error = "Argument List has to be proper list!";
+				return false;
+			}
+			*out = Call{.head = fn, .args = args};
+			return true;
+		}
+		template<class T>
+		auto operator()(const T &_) const -> bool {
+			*out = self;
+			return true;
+		}
+	};
+
+	auto eval(Interpreter &interp, Env &env, const std::vector<Atom> &args,
+			  Atom *out) -> bool {
+		if (args.size() != 1) {
+			interp.error = argument_error(1, args.size());
+			return false;
+		}
+		Atom evaled;
+		if(!interp.eval(args[0], interp.mod.global, &evaled)) return false;
+		evaled.visit(
+					 Eval{.interp = interp, .self = evaled, .out = &evaled});
+		return interp.eval(evaled, interp.mod.global, out);
+	}
+	  
 }

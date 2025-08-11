@@ -47,6 +47,7 @@ namespace TTT {
 		Atom *out_port;
 		Atom *f_read;
 		Atom *f_error;
+		Atom *f_eval;
 
 		std::unordered_map<Atom, Atom*> readTable;
 

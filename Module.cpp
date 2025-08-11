@@ -27,8 +27,11 @@ Module::Module()
 	register_atom("car"		, Special{.func = get_car			, .env = {} });
 	register_atom("cdr"		, Special{.func = get_cdr			, .env = {} });
 	register_atom("if"			, Special{.func = _if				, .env = {} });
+	register_atom("list"			, Special{.func = list				, .env = {} });
+	register_atom("quote"			, Special{.func = quote				, .env = {} });
 	f_read = register_atom("read"		, Special{.func = read				, .env = {} });
 	f_error = register_atom("error"		, Special{.func = error			, .env = {} });
+	f_eval = register_atom("eval"		, Special{.func = eval			, .env = {} });
 	
 	init_readTable();
 }
