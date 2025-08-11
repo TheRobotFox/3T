@@ -1,4 +1,4 @@
-#include "Interpreter.hpp"
+#include "Atom.hpp"
 #include "Printer.hpp"
 #include <cstddef>
 #include <format>
@@ -6,13 +6,6 @@
 #include <vector>
 
 using namespace TTT;
-
-
-
-std::ostream &operator<<(std::ostream &os, Atom const &m) {
-	m.visit(Printer{os});
-	return os;
-}
 
 
 template <class T>

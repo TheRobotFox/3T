@@ -99,3 +99,9 @@
   Interperter Creates Stackframes (varaible for apply)
   GC will free Stackframes not pointed to
   GC will compress closure Stack frames into compressed format 
+* TODO Progress
+  * [ ] GC
+  * [ ] Tail-Call-Optimization
+  * [ ] Stack-Trace
+  * [ ] Step-Through-Debugger
+  * [ ] Byte-Compiler

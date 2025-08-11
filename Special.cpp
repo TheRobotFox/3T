@@ -366,10 +366,10 @@ namespace TTT {
 			return false;
 		}
 		if (const auto *sym = std::get_if<Symbol>(&args.at(0))) {
-			Atom *evaled = interp.mod.memory.alloc();
-			if(!interp.eval(args[1], called_from, evaled)) return false;
-			called_from[sym->id] = evaled;
-			*out = nil{};
+			Atom *cell = interp.mod.memory.alloc();
+			if(!interp.eval(args[1], called_from, cell)) return false;
+			called_from[sym->id] = cell;
+			*out = *cell;
 			return true;
 		}
 		interp.error = "First Argument must be a Symbol";
@@ -432,11 +432,16 @@ namespace TTT {
 			interp.error = argument_error(2, args.size());
 			return false;
 		}
-		*out = nil{};
-		if (const auto *sym = std::get_if<Symbol>(&args.at(0)))
+		if (const auto *sym = std::get_if<Symbol>(&args.at(0))) {
+			*out = nil{};
+
+			if (!called_from.contains(sym->id)) {
+				interp.error = interp.mod.get_symbol_name(sym->id) + " is not defined yet!";
+				return false;
+			}
 			return interp.eval(args[1], called_from,
 						  called_from[sym->id]);
-		
+		}
 		interp.error = "First Argument must be a Symbol";
 		return false;
 	}

@@ -4,13 +4,7 @@
 #include <sstream>
 #include <string>
 
-std::string print(Atom &a) {
-	std::ostringstream out;
-	out << a;
-	return out.str();
-}
-
-int main(void) {
+auto main(void) -> int {
 
 	Module mod;
 
