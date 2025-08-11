@@ -140,13 +140,13 @@ namespace TTT {
 
 
 	template <class Op>
-	auto make_op(Op &&fn)
+	auto make_op(Op &&fn, int neutral) // FIXME Divison by zero
 	    -> std::function<bool(Interpreter &, Env &, Env &,
 						   const std::vector<Atom> &, Atom *)> {
-	  return [fn](Interpreter &interp, Env &called_from, Env &_,
+		return [fn, neutral](Interpreter &interp, Env &called_from, Env &_,
 		     const std::vector<Atom> &args, Atom *out) -> bool {
-	      long long ires = 0;
-	      double rres    = 0;
+	      long long ires = neutral;
+	      double rres    = neutral;
 	      bool exact = true;
 			for (const Atom &a : args) {
 				Atom evaled;

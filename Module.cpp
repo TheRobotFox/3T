@@ -34,11 +34,10 @@ Module::Module()
 	register_atom("lambda"		, Special{.func = lambda			, .env = {} });
 	register_atom("set", Special{.func = set, .env = {}});
 	
-	register_atom("+"		, Special{.func = make_op([](auto a, auto b){return a+b;})			, .env = {} });
-	register_atom("*"		, Special{.func = make_op([](auto a, auto b){return a*b;})			, .env = {} });
-	register_atom("/"		, Special{.func = make_op([](auto a, auto b){return a/b;})			, .env = {} });
-	register_atom("-",
-		      Special{.func = make_op([](auto a, auto b) { return a - b; }),
+	register_atom("+"	, Special{.func = make_op([](auto a, auto b){return a+b;}, 0), .env = {} });
+	register_atom("*"	, Special{.func = make_op([](auto a, auto b){return a*b;}, 1), .env = {} });
+	register_atom("/"	, Special{.func = make_op([](auto a, auto b){return a/b;}, 1), .env = {} });
+	register_atom("-"	, Special{.func = make_op([](auto a, auto b) { return a - b; }, 0),
 					  .env  = {}});
 	
 	f_read = register_atom("read"		, Special{.func = read		, .env = {} });
