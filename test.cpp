@@ -2,14 +2,14 @@
 #include <variant>
 
 
-struct structt {
-	int a;
-	
-};
 int main() {
 	Atom c, d;
 	Atom *a = new Atom;
-	c = d;
+    c = d;
+    c = t{};
+    
+    d.marked = false;
+    c.marked = true;
 	*a=c;
 	return (int)(c==d);
 }

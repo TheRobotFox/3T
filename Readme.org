@@ -95,10 +95,19 @@
   * More Optimazations
 
 
-* StackFrames
-  Interperter Creates Stackframes (varaible for apply)
-  GC will free Stackframes not pointed to
-  GC will compress closure Stack frames into compressed format 
+* Memory
+  - Heap / Dynamic Storage
+    Computation Results
+  - Stack ::
+    * Argument Storage index based
+    * Keep stack of Framesizes
+    * Tail-Call-Optimization -> Overwrite Stack Frame 
+    * Closure construction ::
+      * Precompute which args could end up in environment, alloc on heap
+    * Closures register reachable args -> when lambda is executed capture on stack occures -> args get copied to heap and replaced by reference -> env is a list of pointers into heap
+    * Rest Args ::
+      - build new Cons-List referencing Stack (on Stack)
+	
 * TODO Progress
   * [ ] GC
   * [ ] Tail-Call-Optimization

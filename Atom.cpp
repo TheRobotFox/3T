@@ -1,4 +1,5 @@
 #include "Atom.hpp"
+#include "Memory.hpp"
 #include <ankerl/unordered_dense.h>
 #include <cstddef>
 #include <format>
@@ -75,18 +76,22 @@ auto std::hash<HashTable>::operator()(const HashTable &ht) -> size_t {
 	return res;
 }
 
-// void Cons::mark_children(Memory &memory) const {
-// 	memory.mark(car);
-// 	memory.mark(cdr);
-// }
+template<class Fn>
+void CallChildren<Fn>::operator()(Cons &c) const {
+	op(c.car);
+	op(c.cdr);
+}
 auto Cons::operator==(const Cons &other) const -> bool {
 	return this == &other || (*car == *other.car && *cdr == *cdr);
 }
 
-
-// void HashTable::mark_children(Memory &memory) const {
-// 	for(const auto &[k, v] : value) memory.mark(v);
-// }
+template<class Fn>
+void CallChildren<Fn>::operator()(HashTable &ht) const {
+	for (auto &[k, v] : ht.value) {
+        k.visit(*this);
+        op(v);
+    }
+}
 
 auto HashTable::operator==(const HashTable &other) const -> bool {
 	return value == other.value;

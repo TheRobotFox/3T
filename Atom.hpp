@@ -9,17 +9,17 @@
 
 namespace TTT {
 	using SymbolId = long;
-	class Memory;
+	class GC;
 	struct Interpreter;
 
 
 	// Literals
 	template <class T> struct LitImpl;
 
-	using	String	= LitImpl<std::string>;
 	using	Char	= LitImpl<char>;
 	using	Integer = LitImpl<long long>;
-	using 	Real 	= LitImpl<double>;
+	using	Real = LitImpl<double>;
+	using	String	= LitImpl<std::string>;
 
 	struct Symbol;
 	struct Quoted;
@@ -29,6 +29,8 @@ namespace TTT {
 
 
 	// Containers
+    template <class Fn> struct CallChildren;
+
 	struct Cons;
 	struct HashTable;
 
@@ -42,9 +44,10 @@ namespace TTT {
 	// Miscellaneously
 	struct Forward;
 
-    struct Atom;
-	
+	using Atom = std::variant<nil, t, String, Char, Integer, Real, Symbol, Quoted,
+							  Cons, HashTable, Closure, Macro, Special, Forward>; 
 
+	
 
 	using Env = std::unordered_map<SymbolId, Atom *>;
 	struct Cons_iterator;
@@ -61,8 +64,9 @@ template <> struct std::hash<Atom> {
 
 
 /****************************************************
- * Literals *
+ * 						Literals					*
  ****************************************************/
+
 
 template <class T> struct TTT::LitImpl {
 	T value;
@@ -120,6 +124,7 @@ template <> struct std::hash<nil> {
  *					Miscellaneously					*
  ****************************************************/
 
+
 struct TTT::Forward {
 	Atom *reference;
 	auto operator==(const Forward &other) const -> bool;
@@ -131,9 +136,12 @@ template <> struct std::hash<Forward> {
 };
 
 
+
+
 /****************************************************
  *					Procedures						*
  ****************************************************/
+
 
 struct TTT::Closure {
 	Atom *body; /* byte code */
@@ -181,6 +189,13 @@ template <> struct std::hash<Special> {
  *					Containers						*
  ****************************************************/
 
+template <class Fn> struct TTT::CallChildren {
+	Fn op;
+	template <class T> void operator()(const T &_) const {}
+	void operator()(HashTable &ht) const;
+    void operator()(Cons &c) const;
+    CallChildren(const Fn &fn) : op(fn){}
+};
 template <> struct std::hash<Cons> {
 	using is_avalanching = void;
 	auto operator()(const Cons &c) -> size_t;
@@ -193,19 +208,10 @@ template <> struct std::hash<HashTable> {
 
 struct TTT::Cons {
 	Atom *car, *cdr;
-	void mark_children(Memory &mem) const;
 	auto operator==(const Cons &other) const -> bool;
 };
 
 struct TTT::HashTable {
 	ankerl::unordered_dense::map<Atom, Atom *> value;
 	auto operator==(const HashTable &other) const -> bool;
-};
-
-struct TTT::Atom
-	: public std::variant<nil, t, String, Char, Integer, Real, Symbol, Quoted,
-						  Cons, HashTable, Closure, Macro, Special, Forward> {
-							  bool marked;
-							  using std::variant<nil, t, String, Char, Integer, Real, Symbol, Quoted,
-												 Cons, HashTable, Closure, Macro, Special, Forward>::variant;
 };
