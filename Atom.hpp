@@ -1,13 +1,11 @@
 #pragma once
+#include <ankerl/unordered_dense.h>
+#include <atomic>
 #include <cstddef>
-#include <fstream>
+#include <cstdint>
 #include <functional>
-#include <istream>
-#include <memory>
-#include <ostream>
 #include <unordered_map>
 #include <variant>
-#include <concepts>
 
 namespace TTT {
 	using SymbolId = long;
@@ -16,17 +14,21 @@ namespace TTT {
 
 
 	// Literals
-
 	template <class T> struct LitImpl;
 
 	using	String	= LitImpl<std::string>;
 	using	Char	= LitImpl<char>;
 	using	Integer = LitImpl<long long>;
-	using	Real	= LitImpl<double>;
+	using 	Real 	= LitImpl<double>;
+
+	struct Symbol;
+	struct Quoted;
+
+	struct t;
+	struct nil;
 
 
 	// Containers
-	
 	struct Cons;
 	struct HashTable;
 
@@ -35,22 +37,13 @@ namespace TTT {
 	struct Closure;
 	struct Macro;
 	struct Special;
-	struct Call;
 
 	
 	// Miscellaneously
-	
-	struct nil;
-	struct t;
-	struct InPort;
-	struct OutPort;
-	struct Symbol;
-	struct Quoted;
-	
+	struct Forward;
 
-	using Atom =
-		std::variant<nil, t, String, Char, Integer, Real, Symbol, Quoted, Cons, HashTable,
-					 Closure, Macro, Special, Call, InPort, OutPort>;
+    struct Atom;
+	
 
 
 	using Env = std::unordered_map<SymbolId, Atom *>;
@@ -59,14 +52,43 @@ namespace TTT {
 } // namespace TTT
 using namespace TTT;
 
+template <> struct std::hash<Atom> {
+	using is_avalanching = void;	
+	auto operator()(const Atom &at) -> size_t;
+};
+
+
+
+
 /****************************************************
- *					Literals						*
+ * Literals *
  ****************************************************/
 
 template <class T> struct TTT::LitImpl {
 	T value;
 	auto operator==(const LitImpl<T> &other) const -> bool {return value == other.value;}
 };
+
+struct TTT::Symbol {
+	SymbolId id;
+	auto operator==(const Symbol &other) const -> bool = default;
+};
+ 
+struct TTT::Quoted {
+	SymbolId sym;
+	unsigned int depth;
+	auto operator==(const Quoted &other) const -> bool = default;
+};
+
+template <> struct std::hash<Symbol> {
+	using is_avalanching = void;
+	auto operator()(const Symbol &c)	-> size_t;	
+};
+template <> struct std::hash<Quoted> {
+	using is_avalanching = void;
+	auto operator()(const Quoted &c)	-> size_t;
+};
+
 struct TTT::t {
 	auto operator==(const t &_) const -> bool { return true; }
 };
@@ -74,16 +96,20 @@ struct TTT::nil {
 	auto operator==(const nil&_) const -> bool {return true;}
 };
 
-template <class T> struct std::hash <LitImpl<T>> {
+
+template <class T> struct std::hash<LitImpl<T>> {
+	using is_avalanching = void;
 	auto operator()(const LitImpl<T> &l) -> size_t {
 		return std::hash<T>{}(l.value);
 	}
 };
-template<> struct std::hash<t> {
-	auto operator()(const t &_)		-> size_t {return-1;};
+template <> struct std::hash<t> {
+	using is_avalanching = void;
+	auto operator()(const t &_)		-> size_t {return 0x589965cc75374cc3;};
 };
-template<> struct std::hash<nil> {
-	auto operator()(const nil &_)	-> size_t {return 0;};
+template <> struct std::hash<nil> {
+	using is_avalanching = void;
+	auto operator()(const nil &_)	-> size_t {return 0x8ebc6af09c88c6e3;};
 };
 
 
@@ -94,45 +120,15 @@ template<> struct std::hash<nil> {
  *					Miscellaneously					*
  ****************************************************/
 
-struct TTT::Symbol {
-	SymbolId id;
-	auto operator==(const Symbol &other) const -> bool = default;
+struct TTT::Forward {
+	Atom *reference;
+	auto operator==(const Forward &other) const -> bool;
 };
 
-struct TTT::Quoted {
-	SymbolId sym;
-	unsigned int depth;
-	auto operator==(const Quoted &other) const -> bool = default;
+template <> struct std::hash<Forward> {
+	using is_avalanching = void;
+	auto operator()(const Forward &fw) -> size_t;
 };
-
-struct TTT::InPort {
-	std::istream *value;
-	auto operator==(const InPort &other) const -> bool {
-		return value == other.value;
-	}
-};
-struct TTT::OutPort {
-	std::ostream *value;
-	auto operator==(const OutPort &other) const -> bool{
-		return value == other.value;
-	}
-};
-
-template<> struct std::hash<Symbol> {
-	auto operator()(const Symbol &c)	-> size_t;	
-};
-template<> struct std::hash<Quoted> {
-	auto operator()(const Quoted &c)	-> size_t;	
-};
-template<> struct std::hash<InPort> {
-	auto operator()(const InPort &c)	-> size_t;	
-};
-template<> struct std::hash<OutPort> {
-	auto operator()(const OutPort &c) -> size_t;
-};
-
-
-
 
 
 /****************************************************
@@ -146,6 +142,7 @@ struct TTT::Closure {
 	SymbolId rest{0};
 	auto operator==(const Closure &other) const -> bool {return body == other.body;}
 };
+
 struct TTT::Macro {
 	Atom *body;
 	Env env;
@@ -153,6 +150,7 @@ struct TTT::Macro {
 	SymbolId rest;
 	auto operator==(const Macro	  &other) const -> bool  {return body == other.body;}
 };
+
 struct TTT::Special {
 	std::function<bool(Interpreter &, Env &, Env &, const std::vector<Atom> &, Atom *)> func;
 	Env env;
@@ -162,26 +160,17 @@ struct TTT::Special {
 	}
 };
 
-struct TTT::Call {
-	Atom *head;
-	std::vector<Atom> args;
-	auto operator==(const Call &other) const -> bool {
-		return this == &other;
-	}
-};
-
-
-template<> struct std::hash<Closure> {
+template <> struct std::hash<Closure> {
+	using is_avalanching = void;
 	auto operator()(const Closure &c) -> size_t;	
 };
-template<> struct std::hash<Macro> {
-	auto operator()(const Macro &c)	-> size_t;	
+template <> struct std::hash<Macro> {
+	using is_avalanching = void;
+	auto operator()(const Macro &c)	-> size_t;
 };
-template<> struct std::hash<Special> {
+template <> struct std::hash<Special> {
+	using is_avalanching = void;
 	auto operator()(const Special &c) -> size_t;	
-};
-template<> struct std::hash<Call> {
-	auto operator()(const Call &c)	-> size_t;
 };
 
 
@@ -193,10 +182,12 @@ template<> struct std::hash<Call> {
  ****************************************************/
 
 template <> struct std::hash<Cons> {
+	using is_avalanching = void;
 	auto operator()(const Cons &c) -> size_t;
 };
 
 template <> struct std::hash<HashTable> {
+	using is_avalanching = void;
 	auto operator()(const HashTable &ht) -> size_t;
 };
 
@@ -206,55 +197,15 @@ struct TTT::Cons {
 	auto operator==(const Cons &other) const -> bool;
 };
 
-// struct TTT::Cons_iterator {
-//	Atom *current;
-//	auto next() -> Atom * {
-//		if (auto *cons = std::get_if<Cons>(current)) {
-//			current = cons->cdr;
-//			return cons->car;
-//		}
-//		return nullptr;
-//	}
-//	auto count() -> size_t {
-//		size_t length = 0;
-//		while (next() != nullptr)
-//			length++;
-//		return length;
-//	}
-// };
-
 struct TTT::HashTable {
-	HashTable(std::unordered_map<Atom, Atom *> &&value)
-	: value(new std::unordered_map(value)), own(true) {}
-	HashTable(std::unordered_map<Atom, Atom *> &value) : value(&value), own(false){}
-	HashTable(HashTable &&other) : value(other.value), own(other.own) {}
-	HashTable(const HashTable &other) : own(other.own) {
-		if (own)
-			value = new std::unordered_map(*other.value);
-		else
-			value = other.value;
-	}
-	auto operator=(const HashTable &other) noexcept -> HashTable & {
-		if (own)
-			value = new std::unordered_map(*other.value);
-		else
-			value = other.value;
-		
-		return *this;
-	}
-	auto operator=(HashTable &&other) noexcept -> HashTable & {
-		own = other.own;
-		value = other.value;
-		
-		return *this;
-	}
-	std::unordered_map<Atom, Atom *> *value;
-	bool own;
-	void mark_children(Memory &mem) const;
+	ankerl::unordered_dense::map<Atom, Atom *> value;
 	auto operator==(const HashTable &other) const -> bool;
-	~HashTable() {
-		if (own)
-			delete value;
-	}
+};
 
+struct TTT::Atom
+	: public std::variant<nil, t, String, Char, Integer, Real, Symbol, Quoted,
+						  Cons, HashTable, Closure, Macro, Special, Forward> {
+							  bool marked;
+							  using std::variant<nil, t, String, Char, Integer, Real, Symbol, Quoted,
+												 Cons, HashTable, Closure, Macro, Special, Forward>::variant;
 };
