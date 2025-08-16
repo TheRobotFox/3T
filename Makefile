@@ -1,20 +1,27 @@
 CXX = clang++
-CPPFLAGS = -MMD -MP -std=c++26 -ggdb -Wall #-Wextra -Wpedantic
+CPPFLAGS = -MMD -MP -std=c++26 -ggdb -Wall -Wextra -Wpedantic
 BUILD_DIR := build
 
+MEMORY := Atom.cpp GC.cpp Stack.cpp Heap.cpp
+INTERP := Interpreter.cpp Special.cpp Module.cpp $(MEMORY)
 
-SOURCE := Atom.cpp Interpreter.cpp Special.cpp Module.cpp Memory.cpp repl.cpp
+ALL := $(INTERP)
 
-OBJECTS:= $(SOURCE:%=$(BUILD_DIR)/%.o)
-DEPS := $(OBJECTS:.o=.d)
+DEPS := $(ALL:%=$(BUILD_DIR)/%.d)
 
+test: $(patsubst %, $(BUILD_DIR)/%.o, $(MEMORY) test.cpp)
+	mkdir $(BUILD_DIR) -p
+	$(CXX) $^ -o $@ $(LDFLAGS)
 
-$(BUILD_DIR)/%.cpp.o: %.cpp
+$(BUILD_DIR)/%.cpp.o: %.cpp 
 	mkdir -p $(dir $@)
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $< -o $@
 
-repl: $(OBJECTS)
+repl: $(patsubst %.cpp, $(BUILD_DIR)/%.o, $(INTERP) repl.cpp)
 	mkdir $(BUILD_DIR) -p
-	$(CXX) $(OBJECTS) -o $@ $(LDFLAGS)
+	$(CXX) $^ -o $@ $(LDFLAGS)
+clean:
+	rm -rf $(BUILD_DIR)
+
 
 -include $(DEPS)

@@ -76,21 +76,8 @@ auto std::hash<HashTable>::operator()(const HashTable &ht) -> size_t {
 	return res;
 }
 
-template<class Fn>
-void CallChildren<Fn>::operator()(Cons &c) const {
-	op(c.car);
-	op(c.cdr);
-}
 auto Cons::operator==(const Cons &other) const -> bool {
 	return this == &other || (*car == *other.car && *cdr == *cdr);
-}
-
-template<class Fn>
-void CallChildren<Fn>::operator()(HashTable &ht) const {
-	for (auto &[k, v] : ht.value) {
-        k.visit(*this);
-        op(v);
-    }
 }
 
 auto HashTable::operator==(const HashTable &other) const -> bool {

@@ -189,13 +189,6 @@ template <> struct std::hash<Special> {
  *					Containers						*
  ****************************************************/
 
-template <class Fn> struct TTT::CallChildren {
-	Fn op;
-	template <class T> void operator()(const T &_) const {}
-	void operator()(HashTable &ht) const;
-    void operator()(Cons &c) const;
-    CallChildren(const Fn &fn) : op(fn){}
-};
 template <> struct std::hash<Cons> {
 	using is_avalanching = void;
 	auto operator()(const Cons &c) -> size_t;
@@ -214,4 +207,21 @@ struct TTT::Cons {
 struct TTT::HashTable {
 	ankerl::unordered_dense::map<Atom, Atom *> value;
 	auto operator==(const HashTable &other) const -> bool;
+};
+template <class Fn> struct TTT::CallChildren {
+	Fn op;
+	template <class T> void operator()(const T &_) const {}
+    
+	void operator()(HashTable &ht) const {
+		for (auto &[k, v] : ht.value) {
+			k.visit(*this);
+			op(v);
+		}
+	}
+	void operator()(Cons &c) const {
+		op(c.car);
+		op(c.cdr);
+	}
+
+    CallChildren(const Fn &fn) : op(fn){}
 };

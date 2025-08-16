@@ -107,6 +107,9 @@
     * Closures register reachable args -> when lambda is executed capture on stack occures -> args get copied to heap and replaced by reference -> env is a list of pointers into heap
     * Rest Args ::
       - build new Cons-List referencing Stack (on Stack)
+  - Stack Alternative ::
+    * Stack only has pointers to heap allocated args -> more load on GC but lambdas are free -> currying :)
+    * Additionally for currying remove stack frames -> always pointer inc/dec -> no &rest args
 	
 * TODO Progress
   * [ ] GC

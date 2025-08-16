@@ -1,22 +1,21 @@
 #include "Atom.hpp"
 #include "Memory.hpp"
-#include <algorithm>
 #include <cstddef>
 #include <iostream>
 
 namespace TTT {
 
 
-	auto GC::collect() -> bool {
+	auto GC::collect() -> size_t {
 
 		// clear all Marks
-		for (auto &cell : heap.data)
+        for (auto &cell : heap.span())
             cell.pass_nr = UNMARKED;
 
 
 		// mark Atoms visible from Stack transitively
         struct MarkChildren {
-			void operator()(Atom *child) {
+			void operator()(Atom *child) const {
 				auto *cell = reinterpret_cast<Heap::Cell *>(child);
 				if (cell->pass_nr == UNMARKED)
 					return;
@@ -37,19 +36,21 @@ namespace TTT {
         
 		Pass p{.pass_nr = 1, .count = 0, .offset = 0};
 
-		Heap::Cell *read = heap.data.begin().base(),
-		*write = heap.data.begin().base(),
-		*end = heap.data.end().base();
+		Heap::Cell *read = heap.start.get(),
+		*write = heap.start.get(),
+		*end = heap.current;
 
 		while (read != end) {
 			if (read->pass_nr == UNMARKED) {
 				if (p.count == p.chunk.size()) p.flush(heap);
-				p.add(read);
+				p.add(read++);
             } else {
                 *reinterpret_cast<Atom*>(write++)=*reinterpret_cast<Atom*>(read++);
 			}
         }
-        return p.count!=0;
+        p.flush(heap);
+        heap.current -= p.offset;
+        return p.offset;
     }
 
 	auto GC::Pass::get_offset(Heap::Cell *atom) const -> size_t {
@@ -67,7 +68,7 @@ namespace TTT {
 		
 		struct UpdatePointers {
 			Pass &p;
-			void operator()(Atom *&child) {
+			void operator()(Atom *&child) const {
 				auto *cell = reinterpret_cast<Heap::Cell *>(child);
 				if (cell->pass_nr == p.pass_nr)
 					return;
@@ -78,7 +79,7 @@ namespace TTT {
 			}
 		};
 
-		for (Heap::Cell &c : heap.data) 
+		for (Heap::Cell &c : heap.span()) 
 			c.atom.visit(CallChildren(UpdatePointers{*this}));
 
 		offset += count;
@@ -88,13 +89,13 @@ namespace TTT {
 
 	auto GC::alloc() -> Atom * {
 		if(heap.available()>0)
-            return heap.alloc();
-
-        if (collect())
 			return heap.alloc();
-        
-        std::cerr << "Reached Heap exhaustion!";
-        exit(1);
+
+		if (collect()==0)
+			return heap.alloc();
+		
+		std::cerr << "Reached Heap exhaustion!";
+		exit(1);
 	}
-	
-}
+
+} // namespace TTT
