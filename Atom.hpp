@@ -53,10 +53,11 @@ namespace TTT {
 	using Table = ankerl::unordered_dense::map<Atom, Atom *>;
 	using Environment = std::unordered_map<SymbolId, Atom*>;
 	struct Closure {
-        size_t expressionId : 32;
-        size_t argCount : 31;
-        size_t restArg  : 1;
-		ankerl::unordered_dense::map<SymbolId, Atom*> *env;
+		Environment env;
+		std::vector<SymbolId> args;
+		SymbolId rest;
+		Expression *xp;
+		/* Byte Code */
 	};
 	struct Macro {
 		Environment env;
