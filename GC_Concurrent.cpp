@@ -1,4 +1,4 @@
-#include "Memory.hpp"
+#include "Atom.hpp"
 #include <cstddef>
 #include <mutex>
 #include <thread>
@@ -6,7 +6,8 @@
 namespace TTT::GC {
 	Concurrent::Concurrent(Buffer &heap, Stack &stack)
 	: t([this]() { watch(); }), heap(heap), stack(stack) {
-		t.detach();
+        t.detach();
+        static_assert(TypeInfo::union_size <= MAX_CELL_SIZE, "Large Cells might become Inefficient!");
 	}
 	Concurrent::~Concurrent() {running = false;}
 

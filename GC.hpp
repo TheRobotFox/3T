@@ -1,4 +1,4 @@
-#include "Atom.hpp"
+#include <cstddef>
 #include <thread>
 #include <vector>
 
@@ -6,6 +6,8 @@ namespace TTT {
 
 	class Buffer;
     class Stack;
+    class Atom;
+    class Header;
 
     class ConventionalMarker {
 		std::vector<Atom *> stack;
@@ -17,7 +19,9 @@ namespace TTT {
 
     using use_marker = ConventionalMarker;
 
-	namespace GC {
+    namespace GC {
+
+#define MAX_CELL_SIZE 16
 
 		// class CompactGC {
 
@@ -53,22 +57,7 @@ namespace TTT {
 		// 	{}
 		// };
 
-
-		template <class A> struct GetCell {
-			class Cell : public A {
-				Bool_t marked = 1;
-
-			public:
-				auto isMarked() const -> Bool_t { return marked; }
-				void mark() {marked = 1;}
-				void unmark() {marked = 0;}
-			};
-		};
-    
-		template <Header3Col A>struct GetCell<A> {
-			using Cell = A;
-		};
-    
+  
 		class Concurrent {
             std::thread t;
             std::mutex mtx;
@@ -78,28 +67,32 @@ namespace TTT {
             use_marker marker;
 
             Buffer &heap;
-			Stack &stack;
+            Stack &stack;
 
+            struct Allocation {
+				Atom *start;
+				size_t length;
+            };
+
+            std::vector<Allocation> allocations;
         public:
-        
-			using Cell = GetCell<Atom>::Cell;
         
 			long long threshold;
 			auto collect() -> size_t;
-            auto alloc() -> Atom *;
+            auto alloc(Header h) -> Atom *;
             Concurrent(Buffer &heap, Stack &stack);
             ~Concurrent();
         };
 
         // Allocate control and data Arenas -> Atoms same size
-        class Dynamic {
+        class Dynamic {};
+        // Allocate control Pages for each Atom Type (or same size) and data Buffers
+        class DynamicSep {
 			
-        }
+        };
+
 	}
 
     using use_gc = GC::Concurrent;
-
-    
-    using Cell = typename use_gc::Cell;
 	
 }

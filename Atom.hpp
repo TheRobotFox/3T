@@ -1,260 +1,195 @@
+#include "util.hpp"
+#include <ankerl/unordered_dense.h>
+#include <bits/cxxabi_init_exception.h>
 #include <cassert>
 #include <cstddef>
-#include <cstdint>
-#include <ankerl/unordered_dense.h>
-#include <memory>
-#include <type_traits>
-#include "util.hpp"
+#include <unordered_map>
+#include "GC.hpp"
 
 namespace TTT {
 
-    class Evaluator;
+	class Atom;
+	struct Expression;
+    struct Evaluator;
+    class Header;
 
-
-    
 	/*
-	 * Atom Types
+	 * Types
 	 */
 
+    enum Type : uint8_t {
+      NIL,
+      T,
+      INT,
+      REAL,
+      SYMBOL,
+      QUOTED,
+      CONS,
+      TABLE,
+      CLOSURE,
+      MACRO,
+      SPECIAL,
+      ARRAY,
+      FORWARD
 
-	enum Type : Type_t {
-		NIL,
-		T,
-		INT,
-		REAL,
-		STRING,
-		SYMBOL,
-		QUOTED,
-		CONS,
-		TABLE,
-		CLOSURE,
-		MACRO,
-		SPECIAL,
-		ARRAY
+
 	};
 
-	using Nil = struct{};
-	using t = struct {};
+	using SymbolId = long long;
+
+
+	struct Quoted {
+		SymbolId sym;
+		long long depth;
+	};
+
+	struct Cons {
+		Atom *car, *cdr;
+    };
+
 
     struct Array;
-
-    struct Quoted {
-		long long sym;
-		long long depth;
-    };
-    struct Cons;
-    struct Closure;
-    using Macro = Closure;
-    struct Special;
-    struct Table;
-
-    template <class... Types> class AtomData;
     
-    using util::AtomType;
-    using Atom = AtomData < AtomType<NIL, Nil>, AtomType<T, t>,
-						   AtomType<INT, long long>, AtomType<REAL, double>,
-						   AtomType<STRING, std::string>, AtomType<SYMBOL, long long>,
-						   AtomType<QUOTED, Quoted>, AtomType<CONS, Cons>,
-						   AtomType<TABLE, Table>,
-						   AtomType<CLOSURE, Closure>, AtomType<MACRO, Macro>,
-						   AtomType<SPECIAL, Special>,
-						   AtomType<ARRAY, Array>>;
-
-
-
-	
-
-	// Compact Header tries uses Bit-Ops to fit fields into single Byte
-	template<size_t TypeCount>
-	class CompactHeader {
-        size_t data{markBit};
-
-        constexpr static const size_t typeBits = util::repBits(TypeCount);
-
-        constexpr static const size_t typeMask =
-            (1 << typeBits) - 1;
-        constexpr static const size_t markBit =
-            1 << (typeBits + 1);
-        constexpr static const size_t processedBit =
-            1 << (typeBits + 2);
-        constexpr static const size_t refBit =
-            1 << (typeBits + 3);            
-        
-	public:
-		
-		constexpr auto getType() const -> Type_t	{return		 data &	 typeMask	  ;}
-        constexpr void setType(Type_t t)    		{data = (data & ~typeMask) | t;}
-
-
-		constexpr auto isRef() const	 -> Bool_t {return data & refBit;}
-		constexpr void setRef() 		 	  	   {data |=  refBit;}
-		constexpr void unsetRef() 		 	  	   {data &= ~refBit;}
-        
-		constexpr auto isMarked() const -> Bool_t { return data & markBit; }
-		constexpr void mark() {data|= markBit;}
-		constexpr void unmark() {data &= ~markBit;}
-
-        constexpr auto isProcessed() const -> Bool_t {return data & processedBit;  }
-		constexpr void setProcessed() 				 {data |= 	processedBit; }
-		constexpr void unsetProcessed() 			 {data &=  ~processedBit; }
-
-		constexpr CompactHeader(Type_t type, bool ref = false) {
-			setType(type);
-			if (ref) setRef();
-		}
-	};
-
-
-	
-    
-	// Select Header to use
-	template<size_t TypeCount>
-	using use_header = CompactHeader<TypeCount>;
-
-
-    
-	// Variant-esque Implementation of Generic Box
-	template <class... Types>
-	class AtomData : private Types..., public use_header<sizeof...(Types)> {
-        static_assert(util::_check_ids_well_ordered<Types...>(),
-                        "TypeIds must form Interval 0..n!");
-	public:
-        using header = use_header<sizeof...(Types)>;
-        template <size_t id>
-        using Type = Types...[id];
-
-		template <class E, size_t id = 0>
-		static constexpr auto type_id() -> size_t {
-			if constexpr (id>=sizeof...(Types)) return id;
-			else if constexpr (std::is_same_v<typename Types...[id] ::Type, E>)
-				return id;
-			else return type_id<E, id+1>();
-		}
-
-		
-		// Impl visit
-		template <class Fn> auto visit(Fn &&fn) {
-			using Result = decltype(fn((Types...[0]{})));
-			static constexpr std::array<Result (*)(Fn&&, AtomData<Types...> &), sizeof...(Types)> vtable = {&invoke<Fn, Types::Id> ...};
-			return vtable[header::getType()](std::forward<Fn>(fn), *this);
-        }
-
-		template <template <size_t> class Visitor, class... Args> auto visitId(Args &&...args) {
-			using Result = decltype(Visitor<0>::operator()(args...));
-
-			static constexpr std::array<Result (*)(Args...), sizeof...(Types)> vtable = {&Visitor<Types::Id>::operator() ...};
-			return vtable[header::getType()](args...);
-		}
-
-        template <size_t id>
-		auto get_unchecked() -> util::index_pack<id, Types...>::Type::Type & { // G++ Struggels with mangleing type-parameter Pack indexing
-			static_assert(id<sizeof...(Types), "TypeId out of Range!");
-			if (this->isRef())
-				return *reinterpret_cast<Types...[id]::Type *>(data[0]);
-			return *reinterpret_cast<Types...[id]::Type*>(&data);
-		}
-
-     	template <size_t id>
-		auto get() -> Types... [id] ::Type* {
-			if (header::getType() != id)
-				return nullptr;
-			return &get_unchecked<id>();
-		}
-		
-		template <size_t id>
-		auto size_of() -> size_t {
-			assert(header::getType() != id && "AtomData holds different Type, could not obtain size!");
-			return Types...[id]::size_of(get_unchecked<id>())+sizeof(*this);
-		}
-
-	private:
-
-		void* data[0];
-
-
-		// dispatcher for VTable
-		template <class Fn, size_t id>
-		static decltype(auto) invoke(Fn &&fn, AtomData &ad) {
-			// if constexpr (std::is_same_v<typename Types...[id] ::Type, void>)
-			//	exit(-1);
-			// else
-			return std::invoke(fn, ad.get_unchecked<id>());
-        }
-	public:
-          template <size_t id>
-		  AtomData(Types...[id] ::Type &&data) : header(id) {
-			  using T = Types...[id] ::Type;
-			  static_assert(id < sizeof...(Types),
-								"Type is not part of Atom, failed to "
-								"retrieve TypeId!");
-		
-			  std::construct_at(reinterpret_cast<T *>(&this->data), data);
-          }
-        
-		template <size_t id>
-		AtomData(Types...[id] ::Type *data) : header(id, true) {
-			using T = Types...[id] ::Type;
-			static_assert(id < sizeof...(Types),
-								"Type is not part of Atom, failed to "
-								"retrieve TypeId!");
-			
-			*reinterpret_cast<T**>(&this->data[0]) = data;
-		}
-		AtomData(header h) : header(h){}
-		AtomData(header &&h, size_t length);
-	};
-
-
-
-	// No arrays of refs
-	struct Array {
-		template <size_t id> struct CallSizeOf {
-            static auto operator()(Atom &elements) -> size_t {
-				if(elements.isRef()!=0) return sizeof(void*);
-                return Atom::Type<id>::size_of(elements.get_unchecked<id>());}
-        };
-
-		const size_t length;
-        Atom elements;
-		template <size_t id> auto at(size_t idx) -> Atom::Type<id>::Type & {
-            using T = Atom::Type<id>::Type;
-            assert(!elements.isRef());
-			return *(&elements.get_unchecked<id>()+idx);
-		}
-		template<size_t id>
-		auto size_of() -> size_t {
-            return sizeof(Array) +
-              (length * elements.visitId<CallSizeOf>(elements));
-        }
-        Array(size_t length, Atom::header h): length(length), elements(h){}
-    };
-    template <class... Types>
-	AtomData<Types...>::AtomData(header &&h, size_t length) : header(ARRAY) {
-
-		auto *a = reinterpret_cast<Array *>(&this->data[0]);
-		std::construct_at(a, length, h);
-	}
-
-	    struct Cons {
-          Atom *car, *cdr;
-        };
-    struct Table {
-        ankerl::unordered_dense::map<Atom, Atom*> val;
-    };
-    
-	using Environment =	ankerl::unordered_dense::map<long long, Atom *>;
-
+	using Table = ankerl::unordered_dense::map<Atom, Atom *>;
+	using Environment = std::unordered_map<SymbolId, Atom*>;
 	struct Closure {
-		Environment env;
-		long long expect_args; // negative = rest args
-		void *body;
+        size_t expressionId : 32;
+        size_t argCount : 31;
+        size_t restArg  : 1;
+		ankerl::unordered_dense::map<SymbolId, Atom*> *env;
 	};
-	using Macro = Closure;
-    struct Special {
-        std::function<bool(Evaluator &, Environment &,
-						Atom *, size_t)> func;
-		
-    };
+	struct Macro {
+		Environment env;
+		std::vector<SymbolId> args;
+		SymbolId rest;		  
+		Expression *xp;
+	};
+	using Special = std::function<bool(Evaluator&, size_t argc, Atom *argv)>;
+
+
+	/*
+	 * Type Info
+	 */
+
+	using util::Assoc;
+	using TypeInfo = util::_TypeInfo <Assoc<NIL, std::monostate>,
+									  Assoc<T, std::monostate>,
+									  Assoc<INT, long long>,
+									  Assoc<REAL, double>,
+									  Assoc<SYMBOL, long long>,
+									  Assoc<QUOTED, Quoted>,
+									  Assoc<CONS, Cons>,
+									  Assoc<TABLE, Table>,
+									  Assoc<CLOSURE, Closure>,
+									  Assoc<MACRO, Macro>,
+									  Assoc<SPECIAL, Special>,
+									  Assoc<ARRAY, Array>,
+									  Assoc<FORWARD, Atom*>>;
+    class Header {
+    protected:
+		size_t data;
+		constexpr void set(size_t bit) { data |= bit;}
+        constexpr void unset(size_t bit) { data &= ~bit; }
+        constexpr void setType(Type_t type) { data = (data & (~typeMask)) | type; }
+        
+
+    private:
+		constexpr static const size_t typeBits = util::repBits(TypeInfo::count);
+		constexpr static const size_t typeMask = (1 << typeBits) - 1;
+                constexpr static const size_t sizeMask =
+                    ((1LLU << (sizeof(data) * 8 - (typeBits + 3))) - 1)
+                    << (typeBits + 3);
+
+		constexpr static auto makeSize(size_t size) -> size_t {
+            assert(size < 1 << (typeBits + 3) && "Max Atom size exeeced!");
+            return size << (typeBits + 3);
+        }
+
+        
+        struct SizeOf {
+			template<size_t id>
+			static constexpr auto operator()()-> size_t {return sizeof(TypeInfo::Type<id>);}	
+        };
+
+	public:
+		constexpr static const size_t markBit	  = 1 << (typeBits + 1);
+		constexpr static const size_t processedBit = 1 << (typeBits + 2);
+
+		auto getType() const -> Type_t { return data & typeMask; }
+		auto getSize() const -> Type_t {
+			return (data & sizeMask) >> (typeBits + 3);
+		}
+		constexpr auto check(size_t bit) const -> bool {
+			return (data & bit) != 0;
+		}
+
+		Header(Type_t type) : data(type | markBit) {
+			assert(type != ARRAY &&
+				   "Using basic constructor for ARRAY does not work!");
+			data |= makeSize(TypeInfo::btable<SizeOf>[type]);
+		}
+		Header(Header subtype, size_t length);
+
+	};
+	class Atom : public Header {
+		void *data[0];
 
 	
-}
+		// Allocate Atom on heap, move object return address
+		struct Move {
+			Atom &self;
+			use_gc &memory;
+			template <size_t id> Atom* operator()() {
+				Atom *target = memory.alloc(self.Header::data);
+				target->get<id>() = std::move(self.get<id>());
+				return target;
+			}
+		};
+
+	public:
+        constexpr Atom(Header &&h) : Header(h) {}
+        
+
+		auto ptr() -> Atom* {
+			if (getType() == FORWARD) {
+				auto *res = reinterpret_cast<Atom *>(data);
+				assert(FORWARD != res->getType() && "WARNING: Nested Forwards!");
+				return res;
+			}
+			return this;
+			
+		};
+		template <size_t id> auto get() -> TypeInfo::Type<id> & {
+			Atom *p = ptr();
+			assert(id == p->getType() &&
+				   "Atom requested wrong type!");
+			
+			return *reinterpret_cast<TypeInfo::Type<id>*>(p->data);
+		}
+
+		auto moveHeap(use_gc &memory) {
+			if(getType() != FORWARD){
+				*reinterpret_cast<Atom **>(&data) =
+					TypeInfo::vtable<Move>[getType()](
+													  {.self = *this, .memory = memory});
+                setType(FORWARD);
+			}
+		}
+		
+		// used to get pointer to next Argument on Stack
+		auto next() -> Atom* {
+			return reinterpret_cast<Atom *>(
+									   reinterpret_cast<std::byte *>(&data) +
+									   getSize());
+		}
+    };
+
+
+
+    struct Array {
+		Header header;
+		const size_t length;
+        void *data[0];
+    };
+
+};
