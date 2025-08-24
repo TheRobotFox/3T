@@ -117,3 +117,19 @@
   * [ ] Stack-Trace
   * [ ] Step-Through-Debugger
   * [ ] Byte-Compiler
+
+
+
+
+
+  vector<void*> available[TypeCount];
+  vector<Type_t> chunks;
+
+  TypedChunk {
+  bitvec<maxcount> marked;
+  byte data[chunksize];
+  }
+
+  Chunksize = gcd(TypeSizes...) * MIN_COUNT bytes
+  maxcount = Chunksize/min(TypeSizes...);
+  auto getType(void* e) -> Type_t {chunkTypes[e - heap_base / Chunksize]}
