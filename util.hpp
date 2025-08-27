@@ -1,4 +1,3 @@
-#include <algorithm>
 #include <concepts>
 #include <cstddef>
 #include <cstdint>
@@ -35,9 +34,9 @@ namespace TTT {
 			if (b % a == 0)
 				return a;
 			return gcd(b % a, a);
-		}
+        }
 
-
+		// Compute lowest common Mutiple using gcd 
 		template <size_t a, size_t... Args> constexpr auto lcm() -> size_t {
 			if constexpr (sizeof...(Args) == 0){
 				return a;
@@ -86,8 +85,9 @@ namespace TTT {
 			}
         public:
 			static constexpr size_t count = sizeof...(Tp);
-			static constexpr size_t union_size = std::max({sizeof(Tp) ...});
-			static constexpr size_t lcm = std::max({sizeof(Tp) ...});
+			template <template<class...> class R>
+			constexpr static auto Result = R<Tp...>::Result;
+
 
 			// Get Associated Type from id
             template <size_t id> using Type = pack_index<index<id>(), Tp...>::Result::Type;

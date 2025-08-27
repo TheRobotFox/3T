@@ -1,4 +1,5 @@
 #include "GC.hpp"
+#include <algorithm>
 #include <cassert>
 #include <cstddef>
 
@@ -28,9 +29,13 @@ namespace TTT {
 			type = FORWARD;
 		}
 
-	private:
-        
-		std::byte data[TypeInfo::union_size];
+    private:
+        template<class ...Tp>
+		struct UnionSize {
+			static constexpr size_t Result = std::max({sizeof(Tp)...});
+		};
+
+		std::byte data[TypeInfo::Result<UnionSize>];
 		Type_t type;
 
 		// Move Atom from Stack to Heap
