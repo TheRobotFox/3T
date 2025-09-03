@@ -1,13 +1,13 @@
+#include <algorithm>
 #include <concepts>
 #include <cstddef>
 #include <cstdint>
+#include <map>
 #include <type_traits>
+#include <variant>
 
 namespace TTT {
 	
-	using Type_t = uint8_t;
-	using Bool_t = uint8_t;
-
 	namespace util {
 
         template<std::integral T>
@@ -44,11 +44,17 @@ namespace TTT {
 				constexpr size_t b = lcm<Args...>();
 				return a*b/gcd(a,b);
 			}
+        }
+
+		template <size_t n, size_t p = 0> constexpr auto align2pow() {
+			if constexpr (n <= 1 << p)
+				return p;
+			else return align2pow<n, p+1>();
 		}
 
 
-	    /*
-         * Type Info Infrastructure
+		/*
+		 * Type Info Infrastructure
          */
 
         // G++ does not currently support TypePack Index mangeling
@@ -59,61 +65,85 @@ namespace TTT {
 			using Result = T;
         };
 
-
         
 		template <size_t Id, class T> struct Assoc {
 			constexpr static size_t id = Id;
             using Type = T;
 		};
-	
-		template <class... Tp> class _TypeInfo {
+
+        template <class... Tp> class _TypeInfo {
 
 			template <class T, size_t i = 0> static constexpr auto index() -> size_t {
-				static_assert(i<count, "Unknown Type or Type Id is not enumeration!");
+				static_assert(i<sizeof...(Tp), "Unknown Type or Type Id is not enumeration!");
 				if constexpr (std::is_same_v<T, typename Tp...[i]::Type>)
 					return i;
 				else return index<T, i+1>();
 			}
 			template <size_t id, size_t i = 0> static constexpr auto index() -> size_t {
-				static_assert(i<count, "Unknown Type or Type Id is not enumeration!");
+				static_assert(i<sizeof...(Tp), "Unknown Type or Type Id is not enumeration!");
 				if constexpr (id==Tp...[i]::id)
 					return i;
 				else return index<id, i+1>();
             }
+
+			
+			static constexpr auto checkTypeEnum() -> bool {
+				size_t ids[]{Tp::id...};
+				for (size_t i = 0; i < sizeof...(Tp); i++) {
+					if(!std::ranges::contains(ids, i)) return false;
+				}
+                return true;
+            }
+			template <size_t id> static constexpr auto countEmpty() -> size_t {
+				if constexpr (id == sizeof...(Tp))
+					return id;
+				else if constexpr (std::is_same_v<typename Tp...[index<id>()]::Type, std::monostate>)
+					return countEmpty<id + 1>();
+				else return id;
+			}
+
+			template <size_t id = 0>
+			static constexpr auto countWhileProper() -> size_t {
+				if constexpr (id == sizeof...(Tp) || std::is_same_v<typename Tp...[index<id>()]::Type, std::monostate>)
+					return id;
+				else
+					return countWhileProper<id + 1>();
+			}
+
+			static_assert(checkTypeEnum(), "TypeInfo Ids are not continous sequence!");
+
 			template <class Fn, size_t id> static auto invoke(Fn &&fn) {
 				return fn.template operator()<id>();
 			}
-        public:
+		public:
 			static constexpr size_t count = sizeof...(Tp);
-			template <template<class...> class R>
-			constexpr static auto Result = R<Tp...>::Result;
+			// static constexpr size_t properCount = countWhileProper();
+			// static_assert(countEmpty<properCount>() == count, "Empty Types should be listed last!");
+
+			
+				template <template<size_t...> class R>
+				constexpr static auto Result = R<index<Tp::id>()...>::Result;
 
 
-			// Get Associated Type from id
-            template <size_t id> using Type = pack_index<index<id>(), Tp...>::Result::Type;
+				// Get Associated Type from id
+				template <size_t id> using Type = pack_index<index<id>(), Tp...>::Result::Type;
 
-            // Get Associated Id from Type
-            template <class T>
-			static constexpr size_t id = pack_index<index<T>(), Tp...>::Result::id;
+				// Get Associated Id from Type
+				template <class T>
+				static constexpr size_t id = pack_index<index<T>(), Tp...>::Result::id;
 
-            // generate VTables for type
-            // Fn ::operator() gets instanciated via <size_t id> template
-            template <class Fn>
-            static constexpr decltype(((Fn *)nullptr)
+				// generate VTables for type
+				// Fn ::operator() gets instanciated via <size_t id> template
+				template <class Fn>
+				static constexpr decltype(((Fn *)nullptr)
                                           ->template operator()<0>()) (
                 *vtable[count])(Fn &&){
 					&invoke<Fn, index<Tp::id>()>...
-            };
+				};
 
-            // generate VTable for static Fn and Bake results
-            // Fn ::operator() gets instanciated via <size_t id> template and
-            // called
-			template <class Fn>
-            static constexpr decltype(((Fn*)nullptr)->template operator()<0>()) btable[count] {Fn::template operator()<index<Tp::id>()>() ...};
+			};
+    } // namespace util
 
-
-        };
-	}
 }
 
 

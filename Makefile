@@ -2,7 +2,7 @@ CXX = clang++
 CPPFLAGS = -MMD -MP -std=c++26 -ggdb -Wall -Wextra -Wpedantic
 BUILD_DIR := build
 
-MEMORY := Atom.cpp GC.cpp Stack.cpp Heap.cpp
+MEMORY := GC.cpp Stack.cpp Types.cpp
 INTERP := Interpreter.cpp Special.cpp Module.cpp $(MEMORY)
 
 ALL := $(INTERP)

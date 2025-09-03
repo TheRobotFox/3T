@@ -1,5 +1,8 @@
+#pragma once
 #include "util.hpp"
 #include <ankerl/unordered_dense.h>
+#include <cstddef>
+#include <cstdint>
 #include <sys/types.h>
 
 namespace TTT {
@@ -9,7 +12,7 @@ namespace TTT {
 	class Atom;
 	class GC;
 
-    using Type_t = uint8_t;
+    using Type_t = uint_fast16_t;
 	using Heap_p = void*;
 
 
@@ -18,21 +21,26 @@ namespace TTT {
      */
 
     enum Type : Type_t {
-        NIL,
-        T,
         INT,
         REAL,
         CHAR,
-		SYMBOL,
-		QUOTED,
-		CONS,
-		TABLE,
-		CLOSURE,
-		MACRO,
-		SPECIAL,
-		ARRAY,
-		FORWARD
-	};
+        SYMBOL,
+        QUOTED,
+        CONS,
+        TABLE,
+        CLOSURE,
+        MACRO,
+        SPECIAL,
+        ARRAY,
+        FORWARD,
+        NIL,
+        T
+    };
+
+    template <class T>
+    concept Container = requires(T &e) {
+			e.markChildren();
+    };
 
 	using SymbolId = size_t;
 
@@ -42,35 +50,43 @@ namespace TTT {
     };
 
 	struct Cons {
-		void *car, *cdr;
+        void *car, *cdr;
+        
+        void markChildren() const;
 	};
 
 
 	struct Array {
 		size_t length;
-		void* start;
+        std::byte *start;
+        
+        void markChildren() const;        
 	};
-	
-	using Table = ankerl::unordered_dense::map<Atom, void*>;
-    using Environment = ankerl::unordered_dense::map<SymbolId, void *>;
+
+    struct Table {
+		ankerl::unordered_dense::map<Heap_p, Heap_p> value;
+		
+        void markChildren() const;
+	};
+    using Environment = ankerl::unordered_dense::map<SymbolId, Heap_p>;
     
 	struct Closure {
 		Environment env;
 		std::vector<SymbolId> args;
 		SymbolId rest;
 		Expression *xp;
-		/* Byte Code */
-	};
-	struct Macro {
-		Environment env;
-		std::vector<SymbolId> args;
-		SymbolId rest;		  
-		Expression *xp;
-	};
-	using Special = std::function<bool(Evaluator&, size_t argc, void *argv)>;
-
-
+        /* Byte Code */
+        
+        void markChildren() const;
+    };
     
+    using Special =
+            std::function<bool(Evaluator &, size_t argc, void *argv)>;
+
+    struct Forward {
+		Heap_p ref;
+		void markChildren() const;
+    };
 
 	/*
 	 * Type Info
@@ -87,8 +103,17 @@ namespace TTT {
 									  Assoc<CONS, Cons>,
 									  Assoc<TABLE, Table>,
 									  Assoc<CLOSURE, Closure>,
-									  Assoc<MACRO, Macro>,
+									  Assoc<MACRO, Closure>,
 									  Assoc<SPECIAL, Special>,
 									  Assoc<ARRAY, Array>,
-									  Assoc<FORWARD, Heap_p>>;
+									  Assoc<FORWARD, Forward>>;
+
+    struct Mark {
+        void *cell;
+		template <size_t id> void operator()() {
+			using T = TypeInfo::Type<id>;
+			if constexpr (Container<T>)
+				reinterpret_cast<T*>(cell)->markChildren();
+		}
+	};
 }

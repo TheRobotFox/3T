@@ -1,101 +1,128 @@
-#include "Atom.hpp"
-#include "Memory.hpp"
+#include "GC.hpp"
+#include "Types.hpp"
 #include <cstddef>
-#include <iostream>
+#include <memory>
 
 namespace TTT {
 
 
-	auto GC::collect() -> size_t {
-
-		// clear all Marks
-        for (auto &cell : heap.span())
-            cell.pass_nr = UNMARKED;
-
-
-		// mark Atoms visible from Stack transitively
-        struct MarkChildren {
-			void operator()(Atom *child) const {
-				auto *cell = reinterpret_cast<Heap::Cell *>(child);
-				if (cell->pass_nr == UNMARKED)
-					return;
-				cell->pass_nr = 1;
-				cell->atom.visit(CallChildren(*this));
-			}
-		};
-
-		Atom *stack_top = stack.frame_base.back();
-		for (Atom *a = stack.data.get(); a < stack_top; a++)
-			a->visit(CallChildren(MarkChildren{}));
-
-
-
-                // compact in Chunks
-                // all passes use same std::array containing dead cell addresses
-                // to calculate pointer offsets after compaction
-        
-		Pass p{.pass_nr = 1, .count = 0, .offset = 0};
-
-		Heap::Cell *read = heap.start.get(),
-		*write = heap.start.get(),
-		*end = heap.current;
-
-		while (read != end) {
-			if (read->pass_nr == UNMARKED) {
-				if (p.count == p.chunk.size()) p.flush(heap);
-				p.add(read++);
-            } else {
-                *reinterpret_cast<Atom*>(write++)=*reinterpret_cast<Atom*>(read++);
-			}
-        }
-        p.flush(heap);
-        heap.current -= p.offset;
-        return p.offset;
-    }
-
-	auto GC::Pass::get_offset(Heap::Cell *atom) const -> size_t {
-		size_t offset = this->offset;
-		for (Heap::Cell *dead : chunk) {
-			if (dead > atom)
-				break;
-			++offset;
+	/*
+	 * Chunk
+	 */
+	
+	auto Chunk::getType() const -> Type_t {
+		return *reinterpret_cast<const Type_t *>(data.data());
+	}
+	auto Chunk::getData() -> std::byte * {
+		return reinterpret_cast<std::byte *>(data.data()) + sizeof(Type_t);
+	}
+	auto Chunk::getMarks(std::vector<ChunkInfo> &typeInfo) -> std::byte * {
+		auto &info = typeInfo[getType()];
+		return reinterpret_cast<std::byte *>(data.data()) +
+		  info.typeSize * info.elementCount;
+	}
+	void Chunk::resetMarks(std::vector<ChunkInfo> &typeInfo) {
+		memset(getMarks(typeInfo), 0,
+			   (typeInfo[getType()].elementCount + 7) / 8);
+	}
+	auto Chunk::empty(std::vector<ChunkInfo> &typeInfo) -> bool {
+		const auto *start = getMarks(typeInfo);
+		for (size_t i = 0; i < (typeInfo[getType()].elementCount + 7) / 8;
+			 i++) {
+			if (start[i] != std::byte{0})
+				return false;
 		}
-		return offset;
-    }
+		return true;
+	}
+	auto Chunk::isMarked(std::vector<ChunkInfo> &typeInfo, size_t idx)
+			-> bool {
+		return (getMarks(typeInfo)[idx / 8] & std::byte(1 << (idx % 8))) !=
+		  std::byte{0};
+	}
 
-    void GC::Pass::flush(Heap &heap) {
+	void Chunk::mark(std::vector<ChunkInfo> &typeInfo, void *obj) {
+		size_t idx = (reinterpret_cast<std::byte *>(obj) - getData()) /
+				typeInfo[getType()].typeSize;
+		getMarks(typeInfo)[idx / 8] |= std::byte(1 << (idx % 8));
+	}
 
-		
-		struct UpdatePointers {
-			Pass &p;
-			void operator()(Atom *&child) const {
-				auto *cell = reinterpret_cast<Heap::Cell *>(child);
-				if (cell->pass_nr == p.pass_nr)
-					return;
-					  
-				child = reinterpret_cast<Atom *>(cell - p.get_offset(cell));
-				cell->pass_nr = p.pass_nr;
-				child->visit(CallChildren(*this));
+
+
+	
+	/*
+	 * GC
+	 */
+	
+	void GC::run() {
+		while (running) {
+			if (!std::ranges::any_of(freeCells, [this](const auto &e) {
+				return e.size() < threshold;
+			})) {
+				std::this_thread::sleep_for(std::chrono::microseconds(100));
+				continue;
 			}
-		};
-
-		for (Heap::Cell &c : heap.span()) 
-			c.atom.visit(CallChildren(UpdatePointers{*this}));
-
-		offset += count;
-		count = 0;
-		pass_nr++;
+			collect();
+		}
 	}
 
-	auto GC::alloc() -> Atom * {
-		if(heap.available()>0)
-			return heap.alloc();
+	void GC::collect() {
 
-		if (collect()==0)
-			return heap.alloc();
 		
-		std::cerr << "Reached Heap exhaustion!";
-		exit(1);
-	}
+		/*
+		 * Mark Cells
+		 */
 
+		// Reset Marks
+		for (Chunk &chunk : std::span{heap, chunkCount})
+			chunk.resetMarks(chunkInfo);
+
+		// Mark stack reachable
+		for (Heap_p a : stack.span())
+			mark(a);
+
+
+		// Also mark all known free Cells to not free them twice, also
+		// avoids freeing chunks, which are in the allocation list.
+
+		// if done after thorough marking, shallow marking is
+		// sufficent
+		for (Type_t t = 0; t < typeCount; t++) {
+			for (Heap_p cell : freeCells[t]) 
+				markShallow(cell);
+		}
+
+		/*
+		 * Collect Unmarked Cells
+		 */
+
+		for (Chunk &chunk : std::span{heap, chunkCount}){
+			auto &info = chunkInfo[chunk.getType()];
+
+			if (chunk.empty(chunkInfo))
+				freeChunks.push(&chunk);
+			else for (size_t i = 0; i < info.elementCount ; i++){
+				if (!chunk.isMarked(chunkInfo, i))
+					if(!freeCells[chunk.getType()].push(
+														chunk.getData() + (i * info.typeSize)))
+						break;
+			}
+		}
+
+		/*
+		 * Create new Chunks if needed
+		 */
+		for (Type_t t = 0; t < typeCount; t++) {
+			const auto &info = chunkInfo[t];
+
+			while (freeCells[t].size() < threshold &&
+				   info.typeSize != 0) {
+				Chunk &chunk = heap[chunkCount++];
+				std::construct_at(&chunk, t);
+				
+				for (size_t i = 0; i < info.elementCount; i++)
+					if (!freeCells[t].push(chunk.getData() + i*info.typeSize))
+						break;
+			}
+		}
+	}
 } // namespace TTT
