@@ -1,0 +1,10 @@
+CompileFlags:
+  Add: [-std=c++26, -xc++, -Wall]
+  Compiler: clangd++
+  BuiltinHeaders: QueryDriver
+Index:
+  StandardLibrary: true
+Diagnostics:
+  ClangTidy:
+    Add: modernize*
+    Remove: readability-math-missing-parentheses
