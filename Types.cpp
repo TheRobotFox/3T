@@ -17,13 +17,13 @@ namespace TTT {
 
     void Table::markChildren() const {
 
-		for (const auto &[_, cell] : value.values()) 
+		for (const auto &[_, cell] : value) 
 			GC::getInstance().mark(cell);
     }
 
 	void Closure::markChildren() const {
 
-		for (const auto &[_, cell] : env.values()) 
+		for (const auto &[_, cell] : env) 
 			GC::getInstance().mark(cell);
     }
 

@@ -1,27 +1,24 @@
-#pragma once
+#include "Memory.hpp"
 #include "Types.hpp"
-#include <cstddef>
-#include <vector>
-#include <span>
+
 
 namespace TTT {
 
 	class Stack {
+	public:
+		Stack(size_t size) : m_data(size), m_lastFrame(m_data.begin()) {}
 
-		Heap_p *start;
-		Heap_p *current;
-		Heap_p *end;
-		std::vector<Heap_p *> frame_base;
+		auto push(Type_t) -> Heap_p&;
+		void endFrame();
+		void dropFrame();
 
-    public:
-        
-        Stack(size_t size);
-        ~Stack() {free(start);}
-        void beginFrame();
-        
-        auto push(Heap_p) -> Heap_p&;
+		auto begin() {return m_data.begin();}
+		auto end() {return m_data.end();}
 
-        void dropFrame();
-		auto span() -> std::span<Heap_p>;
+    private:
+		Buffer<void *> m_data;
+		Heap_p *m_lastFrame;
+		
 	};
-} // namespace TTT
+	
+}

@@ -1,6 +1,8 @@
 #include "GC.hpp"
+#include "Memory.hpp"
 #include "Types.hpp"
 #include <cstddef>
+#include <cstdint>
 #include <memory>
 
 namespace TTT {
@@ -9,75 +11,108 @@ namespace TTT {
 	/*
 	 * Chunk
 	 */
-	
+
+
+	auto Chunk::getCount() const -> size_t {
+		
+	}
+	auto Chunk::getTypeSize() const -> size_t {
+		
+	}
 	auto Chunk::getType() const -> Type_t {
-		return *reinterpret_cast<const Type_t *>(data.data());
+		
 	}
 	auto Chunk::getData() -> std::byte * {
-		return reinterpret_cast<std::byte *>(data.data()) + sizeof(Type_t);
+		
 	}
-	auto Chunk::getMarks(std::vector<ChunkInfo> &typeInfo) -> std::byte * {
-		auto &info = typeInfo[getType()];
-		return reinterpret_cast<std::byte *>(data.data()) +
-		  info.typeSize * info.elementCount;
-	}
-	void Chunk::resetMarks(std::vector<ChunkInfo> &typeInfo) {
-		memset(getMarks(typeInfo), 0,
-			   (typeInfo[getType()].elementCount + 7) / 8);
-	}
-	auto Chunk::empty(std::vector<ChunkInfo> &typeInfo) -> bool {
-		const auto *start = getMarks(typeInfo);
-		for (size_t i = 0; i < (typeInfo[getType()].elementCount + 7) / 8;
-			 i++) {
-			if (start[i] != std::byte{0})
-				return false;
-		}
-		return true;
-	}
-	auto Chunk::isMarked(std::vector<ChunkInfo> &typeInfo, size_t idx)
-			-> bool {
-		return (getMarks(typeInfo)[idx / 8] & std::byte(1 << (idx % 8))) !=
-		  std::byte{0};
+	auto Chunk::getMarks() -> std::byte * {
+		
 	}
 
-	void Chunk::mark(std::vector<ChunkInfo> &typeInfo, void *obj) {
-		size_t idx = (reinterpret_cast<std::byte *>(obj) - getData()) /
-				typeInfo[getType()].typeSize;
-		getMarks(typeInfo)[idx / 8] |= std::byte(1 << (idx % 8));
+	auto Chunk::isMarked(size_t idx) -> bool {
+		
 	}
+	auto Chunk::isInitized(size_t idx) -> bool {
+		
+	}
+	auto Chunk::empty() -> bool {
+		
+	}
+		
+	void resetMarks();
+	void setMark(void *obj);
+	void setInitilized(void *obj);
 
 
-
-	
 	/*
 	 * GC
 	 */
 	
-	void GC::run() {
-		while (running) {
-			if (!std::ranges::any_of(freeCells, [this](const auto &e) {
-				return e.size() < threshold;
-			})) {
-				std::this_thread::sleep_for(std::chrono::microseconds(100));
-				continue;
+	auto GC::allocChunk(Type_t type) -> Chunk * {
+		// TODO lock thread?
+	  if (m_freeChunks.size() > 0)
+	      return m_freeChunks.pop();
+	  return &m_heap.emplace(type);
+	}
+
+	auto GC::swapAllocator() -> bool {
+		if (!m_allocatorMtx.try_lock())
+			return false;
+		m_currentAllocator ^= 1;
+		m_allocatorMtx.unlock();
+		m_allocatorCond.notify_one();
+		return true;
+	}
+	
+	
+	auto GC::getChunk(Heap_p cell) -> Chunk & {
+		return *reinterpret_cast<Chunk*>(reinterpret_cast<std::intptr_t>(cell) & ( Chunk::size -1));
+	}
+
+	
+	auto GC::alloc(Type_t type) -> Heap_p {
+		const Heap_p res = m_allocators[m_currentAllocator].alloc(type);
+		if (!res) {
+			if(swapAllocator()) return alloc(type);
+
+			// allocate new Chunks
+			auto info = getInfo(type);
+			if (m_allocChunks[type] == nullptr || m_allocIndex[type] == info.elementCount) {
+				m_allocChunks[type] = allocChunk(type);
+				m_allocIndex[type] = 0;
 			}
-			collect();
+			return m_allocChunks[type]->getData() + m_allocIndex[type] * info.elementCount;
+		}
+		return res;
+	}
+
+
+	void GC::run() {
+		size_t chunks = 0;
+		uint8_t allocator = 0;
+		while (running) {
+			if (m_heap.size() - chunks >= 32) {
+				chunks = m_heap.size();
+				collect();
+			}
+			std::this_thread::sleep_for(std::chrono::microseconds(100));
 		}
 	}
 
-	void GC::collect() {
+	// TODO continued Colletion -> Thread notify empty Allocator
+	//		sceduled Full Mark/Sweep
+
+	void GC::mark() {
 
 		
 		/*
 		 * Mark Cells
 		 */
 
-		// Reset Marks
-		for (Chunk &chunk : std::span{heap, chunkCount})
-			chunk.resetMarks(chunkInfo);
+		for (Chunk &chunk : m_heap)
+			chunk.resetMarks();
 
-		// Mark stack reachable
-		for (Heap_p a : stack.span())
+		for (Heap_p a : stack)
 			mark(a);
 
 
@@ -86,43 +121,47 @@ namespace TTT {
 
 		// if done after thorough marking, shallow marking is
 		// sufficent
-		for (Type_t t = 0; t < typeCount; t++) {
-			for (Heap_p cell : freeCells[t]) 
-				markShallow(cell);
+
+		const auto &prevAllocator =
+			m_allocators[m_currentAllocator ^ 1];
+
+		for (Type_t t = 0; t < m_typeInfo.size(); t++) {
+			
 		}
-
-		/*
-		 * Collect Unmarked Cells
-		 */
-
-		for (Chunk &chunk : std::span{heap, chunkCount}){
-			auto &info = chunkInfo[chunk.getType()];
-
-			if (chunk.empty(chunkInfo))
-				freeChunks.push(&chunk);
-			else for (size_t i = 0; i < info.elementCount ; i++){
-				if (!chunk.isMarked(chunkInfo, i))
-					if(!freeCells[chunk.getType()].push(
-														chunk.getData() + (i * info.typeSize)))
-						break;
-			}
-		}
-
-		/*
-		 * Create new Chunks if needed
-		 */
-		for (Type_t t = 0; t < typeCount; t++) {
-			const auto &info = chunkInfo[t];
-
-			while (freeCells[t].size() < threshold &&
-				   info.typeSize != 0) {
-				Chunk &chunk = heap[chunkCount++];
-				std::construct_at(&chunk, t);
-				
-				for (size_t i = 0; i < info.elementCount; i++)
-					if (!freeCells[t].push(chunk.getData() + i*info.typeSize))
-						break;
-			}
-		}
+		
+		getChunk(cell).setMark(cell);
 	}
-} // namespace TTT
+	
+	void collect() {
+
+			for (Chunk &chunk : std::span{heap, chunkCount}){
+				auto &info = chunkInfo[chunk.getType()];
+
+				if (chunk.empty(chunkInfo))
+					freeChunks.push(&chunk);
+				else for (size_t i = 0; i < info.elementCount ; i++){
+					if (!chunk.isMarked(chunkInfo, i))
+						if(!freeCells[chunk.getType()].push(
+															 chunk.getData() + (i * info.typeSize)))
+							break;
+				}
+			}
+
+			/*
+			 * Create new Chunks if needed
+			 */
+			for (Type_t t = 0; t < typeCount; t++) {
+				const auto &info = chunkInfo[t];
+
+				while (freeCells[t].size() < threshold &&
+					   info.typeSize != 0) {
+					Chunk &chunk = heap[chunkCount++];
+					std::construct_at(&chunk, t);
+				
+					for (size_t i = 0; i < info.elementCount; i++)
+						if (!freeCells[t].push(chunk.getData() + i*info.typeSize))
+							break;
+				}
+			}
+		}
+	} // namespace TTT

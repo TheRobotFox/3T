@@ -1,18 +1,18 @@
 #include "Stack.hpp"
-#include "Types.hpp"
-#include <cassert>
+#include "GC.hpp"
 
 namespace TTT {
-
-	auto Stack::push(Heap_p obj) -> Heap_p& {return *current++ = obj;}
-	void Stack::beginFrame() 	 {frame_base.push_back(current);}
-	void Stack::dropFrame()		 {current = frame_base.back(); frame_base.pop_back();}
-	auto Stack::span() -> std::span<Heap_p> {
-		return {start, current};
-    }
-
-	Stack::Stack(size_t size) : start(new Heap_p[size]), current(start), end(start+size)
-	{}
-
 	
+	auto Stack::push(Type_t type) -> Heap_p & {
+		// GC::getInstance(). (alloate)
+	}
+	void Stack::endFrame() {
+		Heap_p *currentFrame = m_data.m_current;
+		m_data.emplace(m_lastFrame);
+		m_lastFrame = currentFrame;
+	}
+	void Stack::dropFrame() {
+		m_data.m_current = reinterpret_cast<Heap_p**>(m_data.m_current)[-1];
+	}
+
 }

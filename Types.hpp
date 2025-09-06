@@ -1,9 +1,11 @@
 #pragma once
 #include "util.hpp"
-#include <ankerl/unordered_dense.h>
 #include <cstddef>
 #include <cstdint>
+#include <functional>
 #include <sys/types.h>
+#include <unordered_map>
+#include <vector>
 
 namespace TTT {
 		
@@ -64,11 +66,11 @@ namespace TTT {
 	};
 
     struct Table {
-		ankerl::unordered_dense::map<Heap_p, Heap_p> value;
+		std::unordered_map<Heap_p, Heap_p> value;
 		
         void markChildren() const;
 	};
-    using Environment = ankerl::unordered_dense::map<SymbolId, Heap_p>;
+    using Environment = std::unordered_map<SymbolId, Heap_p>;
     
 	struct Closure {
 		Environment env;
