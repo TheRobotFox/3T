@@ -22,9 +22,7 @@ namespace TTT {
     }
 
 	void Closure::markChildren() const {
-
-		for (const auto &[_, cell] : env) 
-			GC::getInstance().mark(cell);
+		environment.markChildren();
     }
 
     void Forward::markChildren() const {

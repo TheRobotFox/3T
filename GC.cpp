@@ -4,6 +4,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <memory>
+#include <mutex>
 
 namespace TTT {
 
@@ -88,14 +89,34 @@ namespace TTT {
 
 
 	void GC::run() {
-		size_t chunks = 0;
 		uint8_t allocator = 0;
+		std::unique_lock<std::mutex> lock(m_allocatorMtx);
 		while (running) {
-			if (m_heap.size() - chunks >= 32) {
-				chunks = m_heap.size();
-				collect();
-			}
-			std::this_thread::sleep_for(std::chrono::microseconds(100));
+
+			m_allocatorCond.wait(lock, [this, &allocator] {
+				return m_currentAllocator != allocator;
+			});
+			if (m_collectChunk - m_heap.begin() <
+				m_heap.size() / 5)
+                mark();
+
+            
+
+			// how long should objcts be protected
+			// at least 1 cycle
+			// allocatorSwapMutex is locked -> we know
+			// which memory can be reached what about
+			// newly allocated chunks??
+
+			// copy State at timestamp
+			// ignore freeChunks
+			// ignore newly created chunks
+			// ignore protected
+			// chunks
+			// ignore cells from freelist
+				
+				
+							
 		}
 	}
 
@@ -123,13 +144,11 @@ namespace TTT {
 		// sufficent
 
 		const auto &prevAllocator =
-			m_allocators[m_currentAllocator ^ 1];
+			m_allocators[m_currentAllocator];
 
-		for (Type_t t = 0; t < m_typeInfo.size(); t++) {
-			
-		}
-		
-		getChunk(cell).setMark(cell);
+		for (Heap_p cell : std::span{prevAllocator.available, prevAllocator.total}) 
+			mark(cell);
+
 	}
 	
 	void collect() {
@@ -165,3 +184,13 @@ namespace TTT {
 			}
 		}
 	} // namespace TTT
+
+
+        // conflict at marking phase
+        // not marking allocated object
+        // Solution: mark all memory visible by allocator
+        // current ALlocation list
+        // when does marking occur -> collect index too low (maybe move away
+// from protected chunks)
+// lock freeListswapMutex while marking => only current freelist is volatile
+// collection is safe if marking is done convervatively

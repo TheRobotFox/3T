@@ -9,34 +9,78 @@ namespace TTT {
 
 	// TODO swap allocators when cell is empty -> notify collector -> block thread on exhaust
 
-	struct Allocator {
+	struct FreeList {
 
-		size_t * const end;
-		size_t * const current;
-		Heap_p *const available;
+        struct FreeListIterator {
+			FreeList &a;
+			Type_t t = 0;
+            Heap_p *pivot = 0;
+            Heap_p *it = 0;
+
+            auto operator*() const -> Heap_p { return *it; }
+			auto operator++() -> FreeListIterator & {
+				if(it < pivot)
+					it = *it == nullptr ? pivot : it--;
+				else {
+					if (*it == nullptr) {
+						pivot = a.typeStart[++t];
+						it = pivot-1;
+					} else {
+						it++;
+					} 
+				}
+				return *this;
+            }
+            auto operator==(const FreeListIterator &other) const -> bool {
+				return it == other.it;
+            }
+        };
+
+        auto begin(/* TODO  */) -> FreeListIterator {return {*this};}
+		auto end(/* TODO  */) -> FreeListIterator {
+			size_t last = 0, curr;
+			for (curr = 1; typeStart[curr] > typeStart[last]; curr++)
+				;
+			Heap_p *it = typeStart[curr];
+			while(it!=nullptr) it++;
+			return {.a=*this, .t=curr, .pivot=typeStart[curr], .it=it};
+        }
+
+
+        // nullptr seperated list of available Cells
+		Heap_p **const typeStart;
+        Heap_p *const freeList;
+        
 
 		[[nodiscard]] auto alloc(Type_t type) const -> Heap_p {
-			if (current[type] == end[type]) return nullptr;
-			return available[current[type]++];
+			Heap_p res = typeStart[type];
+			if (res != nullptr) typeStart[type]++;
+			return res;
 		}
 
-		constexpr Allocator(size_t size, size_t maxTypes)
-		: end(std::allocator<size_t>{}.allocate(maxTypes)),
-		  current(std::allocator<size_t>{}.allocate(maxTypes)),
-		  available(std::allocator<Heap_p>{}.allocate(size)) {
-			std::fill(end, end+maxTypes, 0);
-			std::fill(current, end+maxTypes, 0);
+        auto allocChunk(Type_t) -> Chunk *;
+        auto alloc(Type_t) -> Heap_p;
+
+        auto offer(Type_t, Heap_p) -> bool;
+		void setPriority(float *prio);
+
+		constexpr FreeList(size_t freeListSize, size_t maxTypes)
+		: typeStart(std::allocator<Heap_p *>{}.allocate(maxTypes)),
+		  freeList(std::allocator<Heap_p>{}.allocate(freeListSize)){
+			std::fill(typeStart, typeStart+maxTypes, nullptr);
+			std::fill(freeList, freeList+maxTypes, nullptr);
 		}
-		~Allocator();
+		~FreeList();
 	};
 
-	class GC {
+	class Memory {
 		friend Stack;
     public:
 		
 		struct Settings {
 			size_t heapChunks       = 1 << 12;
-			size_t stackSize        = 1 << 15;
+
+            size_t stackSize        = 1 << 15;
 			size_t maxTypes	       = 1 << 10;
 			size_t allocationBuffer = 1 << 20;
 			size_t chunkreallocation= 32;
@@ -64,14 +108,13 @@ namespace TTT {
 		Stack stack;
 
 	private:
-		auto allocChunk(Type_t) -> Chunk *;
 		auto swapAllocator() -> bool;
-		auto getChunk(Heap_p cell) -> Chunk &;
-		auto alloc(Type_t) -> Heap_p;
-		
-		void run();
-		void mark();
-		void collect();
+        auto getChunk(Heap_p cell) -> Chunk &;
+
+
+        // Spinlocked Thread
+        void run();
+
 
 
 		constexpr GC(Settings settings)
@@ -81,9 +124,9 @@ namespace TTT {
 														   settings.maxTypes)),
 		  m_allocIndex(
 					   std::allocator<size_t>{}.allocate(settings.maxTypes)),
-		  m_allocators(
-					   {{settings.allocationBuffer, settings.maxTypes},
-						{settings.allocationBuffer, settings.maxTypes}}),
+		  m_freeLists(
+					  {{settings.allocationBuffer, settings.maxTypes},
+					   {settings.allocationBuffer, settings.maxTypes}}),
 		  m_typeStress(std::allocator<float>{}.allocate(settings.maxTypes)),
 		  m_typeInfo(settings.maxTypes)
 		{
@@ -104,19 +147,47 @@ namespace TTT {
 		size_t *m_allocIndex;
 		
 		uint8_t m_currentAllocator{};
-		std::array<Allocator, 2> m_allocators;
-		std::mutex m_allocatorMtx;
-		std::condition_variable m_allocatorCond;
+		std::array<FreeList, 2> m_freeLists;
+		std::mutex m_freeListMtx;
+		std::condition_variable m_freeListCond;
 
-		Heap_p m_currentCollect;
+		Chunk *m_collectChunk;
+		size_t m_collectindex;
 		float *m_typeStress;
 
 
 		Buffer<ChunkInfo> m_typeInfo;
 
 		bool running = true;
-		
-		
     };
 
+    class GC {
+    public:
+		GC();
+
+
+		struct ProtectInfo {
+            Chunk **freeChunks;
+            Chunk **activeChunks;
+            
+		size_t protectedChunksCount;
+		size_t chunkCount;
+        FreeList *list;
+		size_t typeCount;
+    };
+
+
+
+        // perform marking cylce -> requires Protection State
+        // (TODO) reset allocation read ptr
+        void mark();
+
+        // regenerate alternate Readlist
+        // 1. Calculate current Stress on each Type
+        // 2. Expand and regenerate AllocatorList by continueing traversal through heap
+        
+
+        void collect();
+
+    };
 }

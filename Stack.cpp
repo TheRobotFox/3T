@@ -8,11 +8,16 @@ namespace TTT {
 	}
 	void Stack::endFrame() {
 		Heap_p *currentFrame = m_data.m_current;
-		m_data.emplace(m_lastFrame);
-		m_lastFrame = currentFrame;
+		m_data.emplace(m_frameBase);
+		m_frameBase = currentFrame;
 	}
 	void Stack::dropFrame() {
-		m_data.m_current = reinterpret_cast<Heap_p**>(m_data.m_current)[-1];
+		m_frameBase = m_data.m_current = reinterpret_cast<Heap_p**>(m_data.m_current)[-1];
 	}
 
 }
+
+VVAVAVVVA
+  0 3   5
+0 3 5   8
+        

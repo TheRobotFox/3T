@@ -29,7 +29,7 @@ namespace TTT {
         SYMBOL,
         QUOTED,
         CONS,
-        TABLE,
+        //TABLE,
         CLOSURE,
         MACRO,
         SPECIAL,
@@ -52,7 +52,7 @@ namespace TTT {
     };
 
 	struct Cons {
-        void *car, *cdr;
+        Heap_p car, cdr;
         
         void markChildren() const;
 	};
@@ -65,17 +65,8 @@ namespace TTT {
         void markChildren() const;        
 	};
 
-    struct Table {
-		std::unordered_map<Heap_p, Heap_p> value;
-		
-        void markChildren() const;
-	};
-    using Environment = std::unordered_map<SymbolId, Heap_p>;
-    
 	struct Closure {
-		Environment env;
-		std::vector<SymbolId> args;
-		SymbolId rest;
+		Array environment;
 		Expression *xp;
         /* Byte Code */
         
@@ -103,7 +94,7 @@ namespace TTT {
 									  Assoc<SYMBOL, long long>,
 									  Assoc<QUOTED, Quoted>,
 									  Assoc<CONS, Cons>,
-									  Assoc<TABLE, Table>,
+									  //Assoc<TABLE, Table>,
 									  Assoc<CLOSURE, Closure>,
 									  Assoc<MACRO, Closure>,
 									  Assoc<SPECIAL, Special>,

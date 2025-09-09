@@ -6,7 +6,7 @@ namespace TTT {
 
 	class Stack {
 	public:
-		Stack(size_t size) : m_data(size), m_lastFrame(m_data.begin()) {}
+		Stack(size_t size) : m_data(size), m_frameBase(m_data.begin()) {}
 
 		auto push(Type_t) -> Heap_p&;
 		void endFrame();
@@ -17,7 +17,7 @@ namespace TTT {
 
     private:
 		Buffer<void *> m_data;
-		Heap_p *m_lastFrame;
+		Heap_p *m_frameBase;
 		
 	};
 	

@@ -138,5 +138,13 @@ store multiple objects of a single type in a continuous Sequence.
 		  constexpr static std::array<ChunkInfo, sizeof...(ids)> Result {
 		      ChunkInfo::build<TypeInfo::Type<ids>>{}()...};
 		};
-	};	
+    };
+
 }
+
+
+// Gargabe collect <- Heap + Stack => FreeList
+// Heap
+// Stack
+// FreeList 
+// Stack <-- Allocation <- Freelist + protect Chunks + mutex
